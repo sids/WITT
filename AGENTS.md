@@ -36,6 +36,7 @@ Core hierarchy:
 3. Areas and rooms may contain containers.
 4. Things live in exactly one current container, area, or room.
 5. Photos should be stored for places, areas, containers, and things. Places should have a name and may have an optional photo.
+6. For MVP photo persistence, use explicit `PhotoAsset` records with Core Data Binary Data configured for external storage. The goal is for photos to remain part of the Core Data object graph mirrored/shared by `NSPersistentCloudKitContainer` when a Place is shared. Keep the model compatible with a later hybrid local-file/CloudKit-asset design if the sharing spike shows the MVP approach is insufficient.
 
 QR codes are central to the experience:
 
@@ -118,4 +119,4 @@ Avoid heavy onboarding or marketing-style screens in the product surface. The fi
 
 Clarify these with Sid before locking implementation:
 
-1. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
+1. Validate with a real-device/two-iCloud-account spike that `PhotoAsset` binary data with external storage is shared correctly when a Place is shared.
