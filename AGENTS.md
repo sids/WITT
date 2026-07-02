@@ -115,6 +115,10 @@ The app should support messy real places: nested containers, ambiguous storage a
 
 Avoid heavy onboarding or marketing-style screens in the product surface. The first useful experience should support the QR-first flow: scan/attach a QR code, bind it if needed, or add a thing from a known code.
 
+Use the iOS 26 Liquid Glass design aesthetic for the app UI. Prefer native-feeling floating glass bottom bars, translucent action capsules, circular glass action buttons, and active selected states that feel consistent with modern iOS apps. For WITT, a scan-QR action can take the role often used by compose buttons in mail apps.
+
+For unknown QR scans, avoid unnecessary intermediate steps. Open the attach-QR screen directly. That screen should immediately show unassigned Storage Areas and Containers grouped by type. If there are no suitable unassigned targets, show a create/bind flow that starts from Room selection or creation, then Storage Area selection or creation, then either attach the QR to the selected Storage Area or select/create a Container. Do not introduce QR binding for Rooms or Things.
+
 ## Open Product Questions
 
 Clarify these with Sid before locking implementation:
