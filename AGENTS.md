@@ -32,7 +32,7 @@ WITT catalogues "things" at home.
 Core hierarchy:
 
 1. Places contain rooms.
-2. Rooms contain areas. `Area` is the current recommended replacement for the older term `Location`; confirm with Sid before deeply baking the name into user-facing copy.
+2. Rooms contain areas. `Area` is the model term; use `Storage Area` in user-facing copy when the extra clarity helps.
 3. Areas and rooms may contain containers.
 4. Things live in exactly one current container, area, or room.
 5. Photos should be stored for places, areas, containers, and things. Places should have a name and may have an optional photo.
@@ -115,7 +115,6 @@ Avoid heavy onboarding or marketing-style screens in the product surface. The fi
 
 Clarify these with Sid before locking implementation:
 
-1. Whether `Area` is the final replacement for the older term `Location`.
-2. Whether QR codes should bind to rooms as well as areas/containers.
-3. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
-4. What iOS 26 device classes should be supported at launch.
+1. Whether QR codes should bind to rooms as well as areas/containers.
+2. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
+3. What iOS 26 device classes should be supported at launch.
