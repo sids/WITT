@@ -1,6 +1,6 @@
 # WITT Agent Brief
 
-WITT means "Where Is The Thing?" This repo is for a native iOS app that helps people catalogue items in storage locations around a home so they can later answer, quickly and confidently, where an item is.
+WITT means "Where Is The Thing?" This repo is for a native iOS app that helps people catalogue items in storage areas around a home or other place so they can later answer, quickly and confidently, where an item is.
 
 The human product manager is Sid. Treat this project as product-led: clarify user workflows, preserve product decisions, and keep implementation threads aligned with the product brief instead of letting the code drift into generic inventory software.
 
@@ -31,19 +31,20 @@ WITT catalogues "things" at home.
 
 Core hierarchy:
 
-1. Properties contain rooms.
-2. Rooms contain locations.
-3. Locations and rooms may contain containers.
-4. Things live in containers, locations, or rooms.
-5. Photos should be stored for locations, containers, and things.
+1. Places contain rooms.
+2. Rooms contain areas. `Area` is the current recommended replacement for the older term `Location`; confirm with Sid before deeply baking the name into user-facing copy.
+3. Areas and rooms may contain containers.
+4. Things live in exactly one current container, area, or room.
+5. Photos should be stored for places, areas, containers, and things. Places should have a name and may have an optional photo.
 
 QR codes are central to the experience:
 
 1. QR codes are associated with areas and containers.
 2. QR codes use `witt://` URLs so scanning opens the app directly.
 3. The app should generate a printable PDF grid of random QR codes.
-4. Scanning an unassociated QR code should offer to bind it to an existing or new location/container.
-5. Scanning a known QR code should open the add-item flow: take a photo, use AI to label and keyword it, then let the user edit/confirm.
+4. Scanning an unassociated QR code should offer to bind it to an existing or new area/container.
+5. Scanning a known QR code should open the add-item flow: take a photo, immediately use AI to label and keyword it, then let the user review, edit, and save.
+6. Things do not need QR codes for the MVP.
 
 AI is expected for photo understanding, item labeling, and keyword/tag generation. Assume an OpenAI-compatible API, but keep provider details isolated so the implementation can change later.
 
@@ -51,7 +52,9 @@ AI is expected for photo understanding, item labeling, and keyword/tag generatio
 
 Build as a native iOS app with SwiftUI. UIKit is acceptable for tricky platform integration where SwiftUI is not enough.
 
-Use Core Data with iCloud sharing for persistence. Sharing should happen at the property level, with complete read/write access for shared participants.
+Minimum supported OS is iOS 26.
+
+Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
 The repo currently contains a minimal Xcode project:
 
@@ -94,7 +97,7 @@ For iOS build/run/test work, prefer the XcodeBuildMCP tools when available. Befo
 
 When adding app code:
 
-1. Keep domain concepts explicit: `Property`, `Room`, `Location`, `Container`, `Thing`, and `QRCode` should remain easy to reason about.
+1. Keep domain concepts explicit: `Place`, `Room`, `Area`, `Container`, `Thing`, and `QRCode` should remain easy to reason about.
 2. Avoid prematurely generic inventory abstractions.
 3. Keep AI service boundaries mockable and provider-agnostic.
 4. Treat iCloud sharing and local persistence as product-critical, not an afterthought.
@@ -104,17 +107,15 @@ When adding app code:
 
 WITT should feel fast and practical during physical cataloging sessions. Optimize for scanning, taking photos, confirming AI suggestions, and moving on.
 
-The app should support messy real homes: nested containers, ambiguous locations, duplicate-looking things, and later edits.
+The app should support messy real places: nested containers, ambiguous storage areas, duplicate-looking things, and later edits.
 
-Avoid heavy onboarding or marketing-style screens in the product surface. The first useful experience should help the user create or enter a property, scan/attach a QR code, or find/add a thing.
+Avoid heavy onboarding or marketing-style screens in the product surface. The first useful experience should support the QR-first flow: scan/attach a QR code, bind it if needed, or add a thing from a known code.
 
 ## Open Product Questions
 
 Clarify these with Sid before locking implementation:
 
-1. Whether a "property" means a home only, or can also mean office/storage unit/etc.
-2. Whether things can belong to multiple locations conceptually, or only have one current physical location.
-3. Whether QR codes identify only locations/containers, or can also identify individual things.
-4. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
-5. Whether AI labeling should run immediately after capture, batched later, or both.
-6. What minimum supported iOS version and device classes are intended.
+1. Whether `Area` is the final replacement for the older term `Location`.
+2. Whether QR codes should bind to rooms as well as areas/containers.
+3. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
+4. What iOS 26 device classes should be supported at launch.
