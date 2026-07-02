@@ -45,6 +45,7 @@ QR codes are central to the experience:
 4. Scanning an unassociated QR code should offer to bind it to an existing or new area/container.
 5. Scanning a known QR code should open the add-item flow: take a photo, immediately use AI to label and keyword it, then let the user review, edit, and save.
 6. Things do not need QR codes for the MVP.
+7. Rooms do not need QR codes for now.
 
 AI is expected for photo understanding, item labeling, and keyword/tag generation. Assume an OpenAI-compatible API, but keep provider details isolated so the implementation can change later.
 
@@ -53,6 +54,8 @@ AI is expected for photo understanding, item labeling, and keyword/tag generatio
 Build as a native iOS app with SwiftUI. UIKit is acceptable for tricky platform integration where SwiftUI is not enough.
 
 Minimum supported OS is iOS 26.
+
+Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
@@ -115,6 +118,4 @@ Avoid heavy onboarding or marketing-style screens in the product surface. The fi
 
 Clarify these with Sid before locking implementation:
 
-1. Whether QR codes should bind to rooms as well as areas/containers.
-2. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
-3. What iOS 26 device classes should be supported at launch.
+1. Whether photo storage should use Core Data external binary storage, CloudKit assets, local files referenced from Core Data, or another approach.
