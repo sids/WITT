@@ -93,6 +93,7 @@ When launching implementation or research work in separate Codex threads:
 7. Read thread results before integrating or assigning dependent work.
 8. Add significant new documents to `docs/README.md`; remove superseded plans and proposals instead of maintaining historical duplicates.
 9. Use `docs/todo.md` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
+10. For UI work, capture simulator screenshots after integration and share them with Sid in the project-manager thread before considering the work complete. Include every materially changed screen, relevant empty and populated states, and iPhone/iPad evidence when the layouts differ. Screenshots are review artifacts, not a substitute for build and test verification.
 
 Prefer worktree threads for substantive code changes so efforts stay isolated. Use local project threads for quick read-only research or small repo inspection tasks.
 

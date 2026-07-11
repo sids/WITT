@@ -17,6 +17,7 @@ Workflow:
 3. Move triaged work into the appropriate priority section; do not silently delete it.
 4. Mark work complete only after verification, not merely implementation.
 5. When a build ships, note it in [status.md](status.md) and [release.md](release.md), then remove completed tasks from this active list.
+6. For every UI change, share simulator screenshots in the project-manager thread before calling the work complete. Cover each materially changed screen, include populated and empty states when relevant, and show both iPhone and iPad when responsive behavior differs.
 
 ## Feedback Inbox
 
