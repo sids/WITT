@@ -6,32 +6,18 @@ The human product manager is Sid. Treat this project as product-led: clarify use
 
 ## Source Context
 
-Primary product note: Bear note titled `WITT: Where Is The Thing?`.
+The `docs/` directory is the canonical home for WITT product, architecture, planning, status, and release documentation. Start with `docs/README.md`, then read the documents relevant to the task.
 
-Bear is the canonical home for WITT project docs. Every durable WITT product, planning, research, or decision note in Bear must be tagged `#projects/WITT`. Prefer titles beginning with `WITT:`. The project docs index is the Bear note titled `WITT: Project Docs Index`.
+Primary context:
 
-The canonical actionable backlog and TestFlight feedback inbox is the Bear note titled `WITT: Todo Tracker` (note ID `386A3DBA-AE52-44A7-A5A0-1A06EBC2DCCA`). Read it before choosing or assigning work. Capture every new issue or product comment there, keep its priority and acceptance criteria current, and mark work complete only after verification. Action lists in older Bear notes are historical context and must not compete with this tracker.
+- `docs/product.md` - product language, workflows, scope, and UX direction.
+- `docs/architecture.md` - implementation-grounded architecture and production boundaries.
+- `docs/ai-labeling.md` - provider-neutral AI contract and security/privacy constraints.
+- `docs/status.md` - current implementation and verification snapshot.
+- `docs/release.md` - durable distribution facts and release process.
+- `docs/todo.md` - the only live backlog and TestFlight feedback inbox.
 
-Use `bearcli` to read it when product context may have changed:
-
-```sh
-bearcli search '@title WITT: Where Is The Thing?' --format json --fields all
-bearcli cat <note-id> --format json
-```
-
-Use this to list project docs:
-
-```sh
-bearcli search '#projects/WITT' --format json --fields all
-```
-
-Use this to read the current backlog directly:
-
-```sh
-bearcli cat 386A3DBA-AE52-44A7-A5A0-1A06EBC2DCCA --format json
-```
-
-In this environment `bearcli` may need permissions outside the repo sandbox because the note lives in Bear's local app storage.
+Capture every new issue or product comment in `docs/todo.md`, keep its priority and acceptance criteria current, and mark it complete only after verification. Do not create or maintain WITT project docs in Bear; the former Bear notes are archived historical material.
 
 ## Product Shape
 
@@ -83,7 +69,7 @@ The repo now contains the sixth integrated implementation milestone:
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
-Version 1.0 build 2 is available through the `WITT Internal` TestFlight group for Sid's next device review. Put all review feedback into `WITT: Todo Tracker` before dispatching fixes.
+Version 1.0 build 2 is available through the `WITT Internal` TestFlight group for Sid's next device review. Put all review feedback into [`docs/todo.md`](docs/todo.md) before dispatching fixes.
 
 ## Working Model For Codex Threads
 
@@ -101,10 +87,10 @@ When launching implementation or research work in separate Codex threads:
    - expected deliverable,
    - verification required,
    - instruction to preserve unrelated user changes.
-6. Ask workers whose output should become durable project documentation to provide a Bear-ready title and summary.
+6. Ask workers to update the relevant file under `docs/` when their work changes durable product, architecture, status, release, or planning context.
 7. Read thread results before integrating or assigning dependent work.
-8. Store durable project docs in Bear with `#projects/WITT` and update `WITT: Project Docs Index` when adding a significant note.
-9. Use `WITT: Todo Tracker` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
+8. Add significant new documents to `docs/README.md`; remove superseded plans and proposals instead of maintaining historical duplicates.
+9. Use `docs/todo.md` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
 
 Prefer worktree threads for substantive code changes so efforts stay isolated. Use local project threads for quick read-only research or small repo inspection tasks.
 
@@ -140,4 +126,4 @@ For unknown QR scans, avoid unnecessary intermediate steps. Open the attach-QR s
 
 ## Active Work
 
-Do not maintain a second backlog in this file. Read `WITT: Todo Tracker` in Bear for current TestFlight feedback, release gates, product decisions, engineering work, and deferred ideas. When this file and the tracker disagree about task status or priority, the tracker wins; settled product and architecture constraints in this file still apply.
+Do not maintain a second backlog in this file. Read `docs/todo.md` for current TestFlight feedback, release gates, product decisions, engineering work, and deferred ideas. When this file and the tracker disagree about task status or priority, the tracker wins; settled product and architecture constraints in this file still apply.
