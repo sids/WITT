@@ -1,15 +1,17 @@
 import SwiftUI
 
 struct FindView: View {
-    let store: DemoInventoryStore
+    @ObservedObject var store: CatalogStore
     @State private var query = ""
 
-    private var results: [DemoThing] {
+    private var results: [ThingSnapshot] {
         guard !query.isEmpty else { return store.things }
         return store.things.filter { thing in
             thing.name.localizedStandardContains(query)
                 || thing.keywords.contains { $0.localizedStandardContains(query) }
-                || thing.location.localizedStandardContains(query)
+                || store.locationComponents(for: thing).contains {
+                    $0.localizedStandardContains(query)
+                }
         }
     }
 
@@ -17,24 +19,36 @@ struct FindView: View {
         NavigationStack {
             List(results) { thing in
                 NavigationLink(value: thing) {
-                    ThingRow(thing: thing)
+                    ThingRow(store: store, thing: thing)
                 }
             }
             .overlay {
                 if results.isEmpty {
-                    ContentUnavailableView.search(text: query)
+                    if query.isEmpty {
+                        ContentUnavailableView(
+                            "No Things Yet",
+                            systemImage: "shippingbox",
+                            description: Text("Scan a Storage Area or Container to add one.")
+                        )
+                    } else {
+                        ContentUnavailableView.search(text: query)
+                    }
                 }
             }
             .navigationTitle("Find")
             .searchable(text: $query, prompt: "Things, keywords, or places")
+            .refreshable { await store.reload() }
             .accessibilityIdentifier("find.searchResults")
-            .navigationDestination(for: DemoThing.self) { thing in
-                ThingDetailView(thing: thing)
+            .navigationDestination(for: ThingSnapshot.self) { thing in
+                ThingDetailView(store: store, thing: thing)
             }
         }
     }
 }
 
 #Preview("Find") {
-    FindView(store: .fixture)
+    let persistence = PersistenceController.inMemory()
+    let store = CatalogStore(persistence: persistence)
+    FindView(store: store)
+        .task { await store.bootstrap() }
 }

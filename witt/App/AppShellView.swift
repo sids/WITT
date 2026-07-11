@@ -7,32 +7,37 @@ enum AppTab: Hashable {
 }
 
 struct AppShellView: View {
-    let store: DemoInventoryStore
+    @ObservedObject var store: CatalogStore
     private let deepLinkRouter: QRDeepLinkRouter
     @State private var selectedTab: AppTab = .browse
-    @State private var presentedScan: ScanDemo?
+    @State private var presentedScan: ScanPresentation?
+    @State private var pendingDemo: ScanDemo?
+    @State private var sharingSheet: PlaceSharingSheet?
     @State private var deepLinkAlert: DeepLinkAlert?
+    @State private var isRoutingQRCode = false
+    @ObservedObject private var shareAcceptanceCenter = PlaceShareAcceptanceCenter.shared
 
     init(
-        store: DemoInventoryStore,
+        store: CatalogStore,
         initialScan: ScanDemo? = nil,
-        qrResolver: any QRCodeResolving = DemoQRCodeResolver()
+        qrResolver: any QRCodeResolving
     ) {
         self.store = store
         deepLinkRouter = QRDeepLinkRouter(resolver: qrResolver)
-        _presentedScan = State(initialValue: initialScan)
+        _pendingDemo = State(initialValue: initialScan)
     }
 
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Browse", systemImage: "square.grid.2x2", value: AppTab.browse) {
-                BrowseView(store: store)
+                BrowseView(store: store, onSharePlace: sharePlace)
             }
 
             Tab("Scan", systemImage: "qrcode.viewfinder", value: AppTab.scan) {
-                ScanLauncherView { demo in
-                    presentedScan = demo
-                }
+                ScanView(
+                    isPaused: selectedTab != .scan || presentedScan != nil || isRoutingQRCode,
+                    onPayload: handleScannerPayload
+                )
             }
 
             Tab(value: AppTab.find, role: .search) {
@@ -40,22 +45,83 @@ struct AppShellView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .sheet(item: $presentedScan) { demo in
+        .sheet(item: $presentedScan) { presentation in
             NavigationStack {
-                switch demo {
-                case .known:
-                    CaptureThingView(store: store)
-                case .unknown:
-                    AttachQRCodeView(store: store)
-                case .review:
+                switch presentation.flow {
+                case .capture(let destination):
+                    CaptureThingView(
+                        store: store,
+                        destination: destination,
+                        onSaved: closeScanFlow
+                    )
+                case .attach(let token):
+                    AttachQRCodeView(
+                        store: store,
+                        token: token,
+                        onAttached: closeScanFlow
+                    )
+                case .review(let destination, let photo):
                     ReviewThingView(
                         store: store,
-                        labelingService: MockThingPhotoLabelingService.demo
+                        destination: destination,
+                        photo: photo,
+                        labelingService: MockThingPhotoLabelingService.demo,
+                        onSaved: closeScanFlow
+                    )
+                case .createAttach(let token):
+                    CreateAndAttachView(
+                        store: store,
+                        token: token,
+                        onAttached: closeScanFlow
+                    )
+                }
+            }
+        }
+        .sheet(item: $sharingSheet) { item in
+            PlaceSharingActivityView(presentation: item.presentation) { result in
+                if case .failure(let error) = result {
+                    deepLinkAlert = DeepLinkAlert(
+                        title: "Couldn't Share Place",
+                        message: error.localizedDescription
                     )
                 }
             }
         }
         .onOpenURL(perform: handleDeepLink)
+        .onChange(of: store.hasLoaded) { _, loaded in
+            guard loaded else { return }
+            if
+                !store.activePlaces.isEmpty,
+                store.activePlaces.allSatisfy({ $0.activeRooms.isEmpty })
+            {
+                selectedTab = .scan
+            }
+            presentPendingDemoIfPossible()
+        }
+        .onChange(of: store.errorMessage) { _, message in
+            guard let message else { return }
+            deepLinkAlert = DeepLinkAlert(title: "WITT Couldn't Finish", message: message)
+            store.errorMessage = nil
+        }
+        .onReceive(shareAcceptanceCenter.$status) { status in
+            switch status {
+            case .accepted:
+                deepLinkAlert = DeepLinkAlert(
+                    title: "Place Added",
+                    message: "The shared Place is now available in WITT."
+                )
+                shareAcceptanceCenter.clearStatus()
+                Task { await store.reload() }
+            case .failed(let error):
+                deepLinkAlert = DeepLinkAlert(
+                    title: "Couldn't Accept Place",
+                    message: error.localizedDescription
+                )
+                shareAcceptanceCenter.clearStatus()
+            case .idle, .accepting:
+                break
+            }
+        }
         .alert(item: $deepLinkAlert) { alert in
             Alert(
                 title: Text(alert.title),
@@ -66,13 +132,16 @@ struct AppShellView: View {
     }
 
     private func handleDeepLink(_ url: URL) {
+        guard !isRoutingQRCode else { return }
+        isRoutingQRCode = true
         Task {
+            defer { isRoutingQRCode = false }
             do {
                 switch try await deepLinkRouter.destination(for: url) {
-                case .addThing:
-                    presentedScan = .known
-                case .attach:
-                    presentedScan = .unknown
+                case .addThing(let destination):
+                    presentedScan = ScanPresentation(flow: .capture(destination))
+                case .attach(let token):
+                    presentedScan = ScanPresentation(flow: .attach(token))
                 case .needsRepair:
                     deepLinkAlert = DeepLinkAlert(
                         title: "QR Code Needs Attention",
@@ -92,6 +161,73 @@ struct AppShellView: View {
             }
         }
     }
+
+    private func handleScannerPayload(_ payload: String) {
+        guard let url = URL(string: payload) else {
+            deepLinkAlert = DeepLinkAlert(
+                title: "Invalid QR Code",
+                message: "This QR code does not contain a valid URL."
+            )
+            return
+        }
+
+        handleDeepLink(url)
+    }
+
+    private func closeScanFlow() {
+        presentedScan = nil
+        selectedTab = .browse
+    }
+
+    private func sharePlace(_ placeID: UUID) {
+        do {
+            sharingSheet = PlaceSharingSheet(
+                id: placeID,
+                presentation: try store.sharingPresentation(for: placeID)
+            )
+        } catch {
+            deepLinkAlert = DeepLinkAlert(
+                title: "Couldn't Share Place",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func presentPendingDemoIfPossible() {
+        guard let demo = pendingDemo else { return }
+        switch demo {
+        case .known:
+            guard let destination = store.defaultThingDestination else { return }
+            presentedScan = ScanPresentation(flow: .capture(destination))
+        case .unknown:
+            let token = try! QRToken(validating: "BBBBBBBBBBBBBBBBBBBBBA")
+            presentedScan = ScanPresentation(flow: .attach(token))
+        case .review:
+            guard let destination = store.defaultThingDestination else { return }
+            presentedScan = ScanPresentation(flow: .review(destination, nil))
+        case .createAttach:
+            let token = try! QRToken(validating: "BBBBBBBBBBBBBBBBBBBBBA")
+            presentedScan = ScanPresentation(flow: .createAttach(token))
+        }
+        pendingDemo = nil
+    }
+}
+
+private struct ScanPresentation: Identifiable {
+    enum Flow {
+        case capture(ThingDestination)
+        case attach(QRToken)
+        case review(ThingDestination, NormalizedPhoto?)
+        case createAttach(QRToken)
+    }
+
+    let id = UUID()
+    let flow: Flow
+}
+
+private struct PlaceSharingSheet: Identifiable {
+    let id: UUID
+    let presentation: PlaceSharingPresentation
 }
 
 private struct DeepLinkAlert: Identifiable {
@@ -101,5 +237,8 @@ private struct DeepLinkAlert: Identifiable {
 }
 
 #Preview("iPad Shell", traits: .landscapeLeft) {
-    AppShellView(store: .fixture)
+    let persistence = PersistenceController.inMemory()
+    let store = CatalogStore(persistence: persistence)
+    AppShellView(store: store, qrResolver: store.repository)
+        .task { await store.bootstrap() }
 }

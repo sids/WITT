@@ -25,3 +25,19 @@ public struct MockThingPhotoLabelingService: ThingPhotoLabelingService {
         }
     }
 }
+
+extension MockThingPhotoLabelingService {
+    static var demo: MockThingPhotoLabelingService {
+        MockThingPhotoLabelingService(
+            mode: .delayedSuccess(
+                ThingLabelSuggestion(
+                    proposedName: "LED Flashlight",
+                    keywords: ["flashlight", "torch", "emergency", "battery"],
+                    detail: "Compact black flashlight.",
+                    confidence: 0.94
+                ),
+                delay: .milliseconds(250)
+            )
+        )
+    }
+}

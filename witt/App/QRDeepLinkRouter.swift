@@ -1,7 +1,7 @@
 import Foundation
 
 enum QRDeepLinkDestination: Sendable {
-    case addThing
+    case addThing(ThingDestination)
     case attach(QRToken)
     case needsRepair
     case conflict
@@ -18,8 +18,10 @@ struct QRDeepLinkRouter: Sendable {
         let qrURL = try WITTQRCodeURL(url: url)
 
         switch try await resolver.resolve(qrURL.token) {
-        case .knownArea, .knownContainer:
-            return .addThing
+        case .knownArea(let id):
+            return .addThing(.area(id.rawValue))
+        case .knownContainer(let id):
+            return .addThing(.container(id.rawValue))
         case .unknown:
             return .attach(qrURL.token)
         case .needsRepair:

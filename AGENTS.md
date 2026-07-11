@@ -60,15 +60,16 @@ Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
-The repo now contains the first integrated implementation milestone:
+The repo now contains the second integrated implementation milestone:
 
-- A native SwiftUI app shell for Browse, Search, Scan, known-QR add Thing, unknown-QR attachment, and Thing detail on iPhone and iPad.
-- A CloudKit-compatible Core Data model plus `PersistenceController`, explicit managed object classes, and containment validation.
-- Strict opaque QR token generation/parsing and provider-neutral QR resolution types.
-- A provider-neutral photo-labeling protocol with a deterministic mock implementation.
-- A `wittTests` target covering QR behavior, domain validation, AI helpers, and the in-memory persistence graph.
+- The Browse, Search, Thing detail, known-QR add Thing, and unknown-QR attach/create flows now use immutable snapshots from `CoreDataCatalogRepository`; `DemoInventoryStore` has been removed.
+- Real AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, and duplicate suppression. Scanned known destinations and unknown tokens are preserved through routing.
+- Camera and Photos picker adapters normalize orientation, strip metadata, cap full images at 2048 px, create 320 px thumbnails, and persist explicit `PhotoAsset` records.
+- The confirmed `iCloud.in.sids.witt` container, iCloud/remote-notification entitlements, private/shared Core Data stores, Place-rooted read/write sharing UI, and invitation acceptance are wired.
+- The one-screen create-and-attach flow can atomically create or select a Room, Storage Area, and Container before binding a scanned QR code.
+- The `wittTests` target has 49 passing simulator tests covering persistence, containment, QR routing/scanning, photo normalization, AI helpers, and Place sharing helpers.
 
-The app root initializes the local Core Data stack, but the current reviewable feature UI still uses `DemoInventoryStore`. Camera capture and scanning are simulator-friendly placeholders, and AI labeling uses the injected mock service. Do not mistake these seams for finished production integrations. The next implementation work should replace the demo store with persistence-backed repositories, add real scanner/photo adapters, configure CloudKit entitlements after confirming the container identifier, and run the real-device sharing spike.
+The production UI is persistence-backed, but AI labeling still uses the injected deterministic mock because provider credentials and runtime configuration are not yet defined. Printable QR-sheet PDF generation and broader add/edit/archive management screens are also not implemented. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
 ## Working Model For Codex Threads
 
@@ -127,4 +128,3 @@ For unknown QR scans, avoid unnecessary intermediate steps. Open the attach-QR s
 Clarify these with Sid before locking implementation:
 
 1. Validate with a real-device/two-iCloud-account spike that `PhotoAsset` binary data with external storage is shared correctly when a Place is shared.
-2. Confirm the production CloudKit container identifier before adding iCloud entitlements. The current bundle identifier is `in.sids.witt`; `iCloud.in.sids.witt` is the natural candidate but is not yet configured.

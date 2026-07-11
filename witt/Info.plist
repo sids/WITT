@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -19,5 +21,11 @@
 	<string>WITT uses the camera to scan storage QR codes and photograph things.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>WITT lets you choose photos for places, storage areas, containers, and things.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>WITTCloudKitContainerIdentifier</key>
+	<string>iCloud.in.sids.witt</string>
 </dict>
 </plist>

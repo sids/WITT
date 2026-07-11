@@ -1,5 +1,5 @@
 import CloudKit
-import CoreData
+@preconcurrency import CoreData
 import Foundation
 
 public final class PersistenceController: NSObject {
@@ -9,7 +9,12 @@ public final class PersistenceController: NSObject {
         case shared
     }
 
-    public static let shared = PersistenceController()
+    public static let shared: PersistenceController = {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return PersistenceController.inMemory()
+        }
+        return PersistenceController()
+    }()
 
     public let container: NSPersistentCloudKitContainer
     public let usesCloudKit: Bool
@@ -19,6 +24,7 @@ public final class PersistenceController: NSObject {
     private var storesByScope: [StoreScope: NSPersistentStore] = [:]
     private var historyTokensByStoreID: [String: NSPersistentHistoryToken] = [:]
     private var remoteChangeObserver: NSObjectProtocol?
+    private var isProcessingHistory = false
 
     public var viewContext: NSManagedObjectContext {
         container.viewContext
@@ -57,6 +63,7 @@ public final class PersistenceController: NSObject {
         let context = container.newBackgroundContext()
         context.name = author
         context.transactionAuthor = author
+        context.automaticallyMergesChangesFromParent = true
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.undoManager = nil
         return context
@@ -72,7 +79,12 @@ public final class PersistenceController: NSObject {
         context.assign(object, to: store)
     }
 
+    @MainActor
     public func processPersistentHistory() async throws {
+        guard !isProcessingHistory else { return }
+        isProcessingHistory = true
+        defer { isProcessingHistory = false }
+
         for store in container.persistentStoreCoordinator.persistentStores {
             guard let storeID = store.identifier else { continue }
             let token = historyTokensByStoreID[storeID]
@@ -80,7 +92,7 @@ public final class PersistenceController: NSObject {
             let transactions: [NSPersistentHistoryTransaction] = try await context.perform {
                 let request = NSPersistentHistoryChangeRequest.fetchHistory(after: token)
                 let fetchRequest = NSPersistentHistoryTransaction.fetchRequest!
-                fetchRequest.predicate = NSPredicate(format: "storeID == %@", storeID)
+                fetchRequest.affectedStores = [store]
                 request.fetchRequest = fetchRequest
 
                 guard

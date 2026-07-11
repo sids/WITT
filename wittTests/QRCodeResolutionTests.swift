@@ -31,4 +31,37 @@ final class QRCodeResolutionTests: XCTestCase {
         XCTAssertEqual(conflict.targets, [.area(areaID), .container(containerID), .area(areaID)])
         XCTAssertEqual(QRCodeResolution.conflict(conflict), .conflict(conflict))
     }
+
+    func testDeepLinkRouterPreservesKnownDestination() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAAA"))
+        let areaID = QRTargetID(rawValue: UUID())
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .knownArea(areaID)))
+
+        let destination = try await router.destination(for: WITTQRCodeURL(token: token).url)
+
+        guard case .addThing(.area(let routedID)) = destination else {
+            return XCTFail("Expected the known Storage Area destination")
+        }
+        XCTAssertEqual(routedID, areaID.rawValue)
+    }
+
+    func testDeepLinkRouterPreservesUnknownTokenForAttachment() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "BBBBBBBBBBBBBBBBBBBBBA"))
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .unknown))
+
+        let destination = try await router.destination(for: WITTQRCodeURL(token: token).url)
+
+        guard case .attach(let routedToken) = destination else {
+            return XCTFail("Expected the unknown QR attachment destination")
+        }
+        XCTAssertEqual(routedToken, token)
+    }
+}
+
+private struct StubResolver: QRCodeResolving {
+    let result: QRCodeResolution
+
+    func resolve(_ token: QRToken) async throws -> QRCodeResolution {
+        result
+    }
 }

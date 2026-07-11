@@ -1,20 +1,23 @@
 import SwiftUI
+import UIKit
 
 struct ThingDetailView: View {
-    let thing: DemoThing
+    @ObservedObject var store: CatalogStore
+    let thing: ThingSnapshot
+
+    private var location: String {
+        store.locationComponents(for: thing).joined(separator: " · ")
+    }
 
     var body: some View {
         List {
             Section {
                 HStack(alignment: .top, spacing: 16) {
-                    Image(systemName: thing.symbolName)
-                        .font(.system(size: 42))
-                        .frame(width: 64, height: 64)
-                        .accessibilityHidden(true)
+                    ThingPhoto(thing: thing)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(thing.name)
                             .font(.title2.weight(.semibold))
-                        Text(thing.location)
+                        Text(location)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -22,16 +25,18 @@ struct ThingDetailView: View {
             }
 
             Section("Where") {
-                Label(thing.location, systemImage: "location")
+                Label(location, systemImage: "location")
             }
 
-            Section("Keywords") {
-                Text(thing.keywords.joined(separator: ", "))
+            if !thing.keywords.isEmpty {
+                Section("Keywords") {
+                    Text(thing.keywords.joined(separator: ", "))
+                }
             }
 
-            if !thing.notes.isEmpty {
+            if let notes = thing.notes, !notes.isEmpty {
                 Section("Notes") {
-                    Text(thing.notes)
+                    Text(notes)
                 }
             }
         }
@@ -41,8 +46,35 @@ struct ThingDetailView: View {
     }
 }
 
-#Preview("Thing Detail") {
-    NavigationStack {
-        ThingDetailView(thing: DemoInventoryStore.fixture.things[0])
+private struct ThingPhoto: View {
+    let thing: ThingSnapshot
+
+    var body: some View {
+        Group {
+            if
+                let data = thing.primaryPhoto?.thumbnailData ?? thing.primaryPhoto?.data,
+                let image = UIImage(data: data)
+            {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "shippingbox")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(.rect(cornerRadius: 6))
+        .accessibilityHidden(true)
     }
+}
+
+#Preview("Thing Detail") {
+    let persistence = PersistenceController.inMemory()
+    let store = CatalogStore(persistence: persistence)
+    NavigationStack {
+        ContentUnavailableView("Load a Thing", systemImage: "shippingbox")
+    }
+    .task { await store.bootstrap() }
 }
