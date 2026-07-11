@@ -353,6 +353,83 @@ final class CatalogPresentationTests: XCTestCase {
         )
     }
 
+    func testDescendantThingCountsIncludeDirectAndDeepNestedThings() {
+        let placeID = UUID()
+        let roomID = UUID()
+        let areaID = UUID()
+        let roomContainerID = UUID()
+        let outerID = UUID()
+        let middleID = UUID()
+        let innerID = UUID()
+        let place = makePlace(
+            name: "Home",
+            rooms: [room(id: roomID, placeID: placeID, name: "Garage")],
+            areas: [area(id: areaID, placeID: placeID, roomID: roomID, name: "Workbench")],
+            containers: [
+                container(id: roomContainerID, placeID: placeID, name: "Cabinet", parent: .room(roomID)),
+                container(id: outerID, placeID: placeID, name: "Tool Chest", parent: .area(areaID)),
+                container(id: middleID, placeID: placeID, name: "Tray", parent: .container(outerID)),
+                container(id: innerID, placeID: placeID, name: "Bit Case", parent: .container(middleID))
+            ],
+            things: [
+                thing(id: UUID(), placeID: placeID, name: "Room Thing", home: .room(roomID)),
+                thing(id: UUID(), placeID: placeID, name: "Area Thing", home: .area(areaID)),
+                thing(id: UUID(), placeID: placeID, name: "Cabinet Thing", home: .container(roomContainerID)),
+                thing(id: UUID(), placeID: placeID, name: "Outer Thing", home: .container(outerID)),
+                thing(id: UUID(), placeID: placeID, name: "Deep Thing", home: .container(innerID))
+            ],
+            id: placeID
+        )
+
+        XCTAssertEqual(place.descendantThingCount(inRoom: roomID), 5)
+        XCTAssertEqual(place.descendantThingCount(inArea: areaID), 3)
+        XCTAssertEqual(place.descendantThingCount(inContainer: outerID), 2)
+        XCTAssertEqual(place.descendantThingCount(inContainer: middleID), 1)
+        XCTAssertEqual(place.descendantThingCount(inContainer: innerID), 1)
+    }
+
+    func testDescendantThingCountsExcludeInactiveAndInvalidBranchesWithoutDoubleCounting() {
+        let placeID = UUID()
+        let otherPlaceID = UUID()
+        let roomID = UUID()
+        let areaID = UUID()
+        let activeContainerID = UUID()
+        let archivedContainerID = UUID()
+        let cycleA = UUID()
+        let cycleB = UUID()
+        let countedThingID = UUID()
+        let place = makePlace(
+            name: "Home",
+            rooms: [room(id: roomID, placeID: placeID, name: "Garage")],
+            areas: [area(id: areaID, placeID: placeID, roomID: roomID, name: "Workbench")],
+            containers: [
+                container(id: activeContainerID, placeID: placeID, name: "Box", parent: .area(areaID)),
+                container(id: archivedContainerID, placeID: placeID, name: "Old Box", parent: .container(activeContainerID), archived: true),
+                container(id: cycleA, placeID: placeID, name: "Cycle A", parent: .container(cycleB)),
+                container(id: cycleB, placeID: placeID, name: "Cycle B", parent: .container(cycleA)),
+                container(id: UUID(), placeID: otherPlaceID, name: "Foreign", parent: .area(areaID))
+            ],
+            things: [
+                thing(id: countedThingID, placeID: placeID, name: "Counted Once", home: .container(activeContainerID)),
+                thing(id: countedThingID, placeID: placeID, name: "Duplicate Record", home: .container(activeContainerID)),
+                thing(id: UUID(), placeID: placeID, name: "Archived Thing", home: .container(activeContainerID), archived: true),
+                thing(id: UUID(), placeID: placeID, name: "Archived Branch", home: .container(archivedContainerID)),
+                thing(id: UUID(), placeID: placeID, name: "Cycle Thing", home: .container(cycleA)),
+                thing(id: UUID(), placeID: otherPlaceID, name: "Foreign Thing", home: .area(areaID))
+            ],
+            id: placeID
+        )
+
+        XCTAssertEqual(place.descendantThingCount(inRoom: roomID), 1)
+        XCTAssertEqual(place.descendantThingCount(inArea: areaID), 1)
+        XCTAssertEqual(place.descendantThingCount(inContainer: activeContainerID), 1)
+        XCTAssertEqual(place.descendantThingCount(inContainer: archivedContainerID), 0)
+        XCTAssertEqual(place.descendantThingCount(inContainer: cycleA), 0)
+        XCTAssertEqual(place.descendantThingCount(inRoom: UUID()), 0)
+        XCTAssertEqual(place.descendantThingCount(inArea: UUID()), 0)
+        XCTAssertEqual(place.descendantThingCount(inContainer: UUID()), 0)
+    }
+
     @MainActor
     func testCreateWrapperReturnsSnapshotAndReloadsCatalog() async {
         let store = CatalogStore(persistence: .inMemory())
@@ -488,7 +565,13 @@ final class CatalogPresentationTests: XCTestCase {
         ContainerSnapshot(id: id, placeID: placeID, name: name, detail: nil, sortOrder: 0, archivedAt: archived ? Date() : nil, parent: parent, primaryPhoto: nil, hasQRCode: hasQRCode)
     }
 
-    private func thing(id: UUID, placeID: UUID, name: String, home: ThingSnapshotHome) -> ThingSnapshot {
-        ThingSnapshot(id: id, placeID: placeID, name: name, keywords: [], notes: nil, nameSource: "user", home: home, createdAt: nil, updatedAt: nil, archivedAt: nil, primaryPhoto: nil)
+    private func thing(
+        id: UUID,
+        placeID: UUID,
+        name: String,
+        home: ThingSnapshotHome,
+        archived: Bool = false
+    ) -> ThingSnapshot {
+        ThingSnapshot(id: id, placeID: placeID, name: name, keywords: [], notes: nil, nameSource: "user", home: home, createdAt: nil, updatedAt: nil, archivedAt: archived ? Date() : nil, primaryPhoto: nil)
     }
 }

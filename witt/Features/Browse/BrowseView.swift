@@ -279,11 +279,23 @@ private struct PlaceListView: View {
                 }
             } else {
                 Section("Rooms") {
-                    ForEach(place.activeRooms) { room in
-                        NavigationLink(value: BrowseRoute.room(room.id)) {
-                            Label(room.name, systemImage: "door.left.hand.open")
+                    TwoColumnBrowseGrid {
+                        ForEach(place.activeRooms) { room in
+                            NavigationLink(value: BrowseRoute.room(room.id)) {
+                                RoomTile(
+                                    room: room,
+                                    thingCount: place.descendantThingCount(inRoom: room.id)
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+
+                Section {
                     Button("New Room", systemImage: "plus") {
                         presentManagement(.createRoom(placeID: place.id))
                     }
@@ -356,27 +368,64 @@ struct RoomDetailView: View {
                 List {
                     let things = place.activeThings(in: .room(room.id))
                     let containers = place.activeContainers(inRoom: room.id)
-                    if !things.isEmpty || !containers.isEmpty {
-                        Section("In Room") {
-                            ForEach(things) { thing in
-                                NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                    ThingRow(store: store, thing: thing)
+                    let areas = place.activeAreas(in: room.id)
+                    if things.isEmpty && containers.isEmpty && areas.isEmpty {
+                        Section {
+                            ContentUnavailableView(
+                                "Room Is Empty",
+                                systemImage: "door.left.hand.open",
+                                description: Text(
+                                    "Add a Storage Area to start organizing this Room."
+                                )
+                            )
+                            .frame(maxWidth: .infinity)
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                    if !things.isEmpty {
+                        Section("Things") {
+                            TwoColumnBrowseGrid {
+                                ForEach(things) { thing in
+                                    NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                        ThingMediaTile(thing: thing)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            ForEach(containers) { container in
-                                NavigationLink(value: BrowseRoute.container(container.id)) {
-                                    Label(container.name, systemImage: "shippingbox")
+                            .browseGridListRow()
+                        }
+                    }
+                    if !containers.isEmpty {
+                        Section("Containers") {
+                            TwoColumnBrowseGrid {
+                                ForEach(containers) { container in
+                                    NavigationLink(value: BrowseRoute.container(container.id)) {
+                                        ContainerMediaTile(
+                                            container: container,
+                                            thingCount: place.descendantThingCount(
+                                                inContainer: container.id
+                                            )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .browseGridListRow()
+                        }
+                    }
+                    if !areas.isEmpty {
+                        Section("Storage Areas") {
+                            ForEach(areas) { area in
+                                NavigationLink(value: BrowseRoute.area(area.id)) {
+                                    StorageAreaRow(
+                                        area: area,
+                                        thingCount: place.descendantThingCount(inArea: area.id)
+                                    )
                                 }
                             }
                         }
                     }
-                    Section("Storage Areas") {
-                        let areas = place.activeAreas(in: room.id)
-                        ForEach(areas) { area in
-                            NavigationLink(value: BrowseRoute.area(area.id)) {
-                                Label(area.name, systemImage: "cabinet")
-                            }
-                        }
+                    Section {
                         Button("New Storage Area", systemImage: "plus") {
                             presentManagement(.createArea(roomID: room.id))
                         }
@@ -420,22 +469,45 @@ private struct AreaDetailView: View {
                     }
                     List {
                         CatalogLocationSummary(photo: area.primaryPhoto, detail: nil)
-                        Section("Contents") {
-                            let things = place.activeThings(in: .area(area.id))
-                            let containers = place.activeContainers(inArea: area.id)
-                            if things.isEmpty && containers.isEmpty {
+                        let things = place.activeThings(in: .area(area.id))
+                        let containers = place.activeContainers(inArea: area.id)
+                        if things.isEmpty && containers.isEmpty {
+                            Section("Contents") {
                                 Text("Empty").foregroundStyle(.secondary)
                             }
-                            ForEach(things) { thing in
-                                NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                    ThingRow(store: store, thing: thing)
+                        }
+                        if !things.isEmpty {
+                            Section("Things") {
+                                TwoColumnBrowseGrid {
+                                    ForEach(things) { thing in
+                                        NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                            ThingMediaTile(thing: thing)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
+                                .browseGridListRow()
                             }
-                            ForEach(containers) { container in
-                                NavigationLink(value: BrowseRoute.container(container.id)) {
-                                    Label(container.name, systemImage: "shippingbox")
+                        }
+                        if !containers.isEmpty {
+                            Section("Containers") {
+                                TwoColumnBrowseGrid {
+                                    ForEach(containers) { container in
+                                        NavigationLink(value: BrowseRoute.container(container.id)) {
+                                            ContainerMediaTile(
+                                                container: container,
+                                                thingCount: place.descendantThingCount(
+                                                    inContainer: container.id
+                                                )
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
+                                .browseGridListRow()
                             }
+                        }
+                        Section {
                             Menu("New", systemImage: "plus") {
                                 Button("Container", systemImage: "shippingbox") {
                                     presentManagement(.createContainer(destination: .area(area.id)))
@@ -499,20 +571,45 @@ private struct ContainerDetailView: View {
                         photo: container.primaryPhoto,
                         detail: container.detail
                     )
-                    Section("Contents") {
-                        let things = place.activeThings(in: .container(container.id))
-                        let children = place.childContainers(of: container.id)
-                        if things.isEmpty && children.isEmpty { Text("Empty").foregroundStyle(.secondary) }
-                        ForEach(things) { thing in
-                            NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                ThingRow(store: store, thing: thing)
-                            }
+                    let things = place.activeThings(in: .container(container.id))
+                    let children = place.childContainers(of: container.id)
+                    if things.isEmpty && children.isEmpty {
+                        Section("Contents") {
+                            Text("Empty").foregroundStyle(.secondary)
                         }
-                        ForEach(children) { child in
-                            NavigationLink(value: BrowseRoute.container(child.id)) {
-                                Label(child.name, systemImage: "shippingbox")
+                    }
+                    if !things.isEmpty {
+                        Section("Things") {
+                            TwoColumnBrowseGrid {
+                                ForEach(things) { thing in
+                                    NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                        ThingMediaTile(thing: thing)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
+                            .browseGridListRow()
                         }
+                    }
+                    if !children.isEmpty {
+                        Section("Containers") {
+                            TwoColumnBrowseGrid {
+                                ForEach(children) { child in
+                                    NavigationLink(value: BrowseRoute.container(child.id)) {
+                                        ContainerMediaTile(
+                                            container: child,
+                                            thingCount: place.descendantThingCount(
+                                                inContainer: child.id
+                                            )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .browseGridListRow()
+                        }
+                    }
+                    Section {
                         Menu("New", systemImage: "plus") {
                             Button("Container", systemImage: "shippingbox") {
                                 presentManagement(.createContainer(destination: .container(container.id)))
@@ -575,6 +672,191 @@ private struct CatalogLocationSummary: View {
             }
         }
     }
+}
+
+private struct TwoColumnBrowseGrid<Content: View>: View {
+    private let content: Content
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+    ]
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            content
+        }
+        .navigationLinkIndicatorVisibility(.hidden)
+    }
+}
+
+private struct BrowseGridListRowModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+}
+
+private extension View {
+    func browseGridListRow() -> some View {
+        modifier(BrowseGridListRowModifier())
+    }
+}
+
+private struct RoomTile: View {
+    let room: RoomSnapshot
+    let thingCount: Int
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "door.left.hand.open")
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 30)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(room.name)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.leading)
+                Text(thingCountLabel(thingCount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .clipShape(.rect(cornerRadius: 8))
+        .contentShape(.rect)
+    }
+}
+
+private struct StorageAreaRow: View {
+    let area: AreaSnapshot
+    let thingCount: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(area.name)
+                    .font(.headline)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Text(thingCountLabel(thingCount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            CatalogThumbnail(photo: area.primaryPhoto, fallbackSystemImage: "cabinet")
+        }
+    }
+}
+
+private struct ThingMediaTile: View {
+    let thing: ThingSnapshot
+
+    var body: some View {
+        CatalogTileMedia(photo: thing.primaryPhoto, fallbackSystemImage: "square.grid.2x2")
+            .overlay(alignment: .bottom) {
+                Text(thing.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.black.opacity(0.56))
+            }
+            .clipShape(.rect(cornerRadius: 8))
+            .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ContainerMediaTile: View {
+    let container: ContainerSnapshot
+    let thingCount: Int
+
+    var body: some View {
+        CatalogTileMedia(photo: container.primaryPhoto, fallbackSystemImage: "shippingbox.fill")
+            .overlay {
+                VStack(spacing: 4) {
+                    Text(container.name)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Text(thingCountLabel(thingCount))
+                        .font(.caption)
+                }
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(10)
+                .background(Color.black.opacity(0.56))
+            }
+            .clipShape(.rect(cornerRadius: 8))
+            .accessibilityElement(children: .combine)
+    }
+}
+
+private struct CatalogTileMedia: View {
+    let photo: PhotoAssetSnapshot?
+    let fallbackSystemImage: String
+
+    var body: some View {
+        CatalogMedia(photo: photo, fallbackSystemImage: fallbackSystemImage)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .clipped()
+            .clipShape(.rect(cornerRadius: 8))
+    }
+}
+
+private struct CatalogThumbnail: View {
+    let photo: PhotoAssetSnapshot?
+    let fallbackSystemImage: String
+
+    var body: some View {
+        CatalogMedia(photo: photo, fallbackSystemImage: fallbackSystemImage)
+            .frame(width: 64, height: 52)
+            .clipped()
+            .clipShape(.rect(cornerRadius: 6))
+    }
+}
+
+private struct CatalogMedia: View {
+    let photo: PhotoAssetSnapshot?
+    let fallbackSystemImage: String
+
+    var body: some View {
+        Group {
+            if let data = photo?.thumbnailData ?? photo?.data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color(uiColor: .secondarySystemGroupedBackground)
+                    Image(systemName: fallbackSystemImage)
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private func thingCountLabel(_ count: Int) -> String {
+    "\(count) \(count == 1 ? "thing" : "things")"
 }
 
 @ViewBuilder

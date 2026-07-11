@@ -22,8 +22,9 @@ Workflow:
 
 - [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (3)`. Close when Sid considers the review pass complete.
 - [x] FB-015 - Sid, July 11, 2026, build `1.0 (3)`: Remember the user's deepest Browse screen across app launches instead of always reopening the Places list. Restore the destination only after the catalog loads, rebuild its current hierarchy if it moved, preserve an intentional return to Places, and fall back safely when the saved destination no longer exists.
+- [x] FB-016 - Sid, July 11, 2026, build `1.0 (3)`: Give Browse collections distinctive layouts. Rooms use two-column landscape tiles with a left icon, a left-aligned name of up to two lines, and descendant Thing count. Storage Areas remain a list with a right-side image, larger name, and smaller descendant Thing count. Things use two-column square photo tiles with the name in a restrained translucent bottom overlay. Containers use two-column square photo tiles with name and descendant Thing count in a restrained translucent center overlay. Provide useful system-image fallbacks when photos are missing and preserve contextual creation actions.
 
-FB-015 is implemented and locally verified for the next TestFlight build. The current simulator suite passes with 115 tests, and the app builds and launches on the configured iPhone simulator.
+FB-015 and FB-016 are implemented and locally verified for the next TestFlight build. The current simulator suite passes with 117 tests, and the app builds and launches on the configured iPhone simulator.
 
 ## P0 - Release Gates
 

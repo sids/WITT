@@ -125,6 +125,34 @@ extension PlaceSnapshot {
         locationComponents(for: home(destination))
     }
 
+    func descendantThingCount(inRoom roomID: UUID) -> Int {
+        guard activeRooms.contains(where: { $0.id == roomID }) else { return 0 }
+        let areaIDs = Set(activeAreas(in: roomID).map(\.id))
+        let containerRoots = activeContainers.compactMap { container -> UUID? in
+            switch container.parent {
+            case .room(let parentRoomID): return parentRoomID == roomID ? container.id : nil
+            case .area(let areaID): return areaIDs.contains(areaID) ? container.id : nil
+            case .container: return nil
+            }
+        }
+        return descendantThingCount(
+            roomID: roomID,
+            areaIDs: areaIDs,
+            containerIDs: containerSubtreeIDs(roots: containerRoots)
+        )
+    }
+
+    func descendantThingCount(inArea areaID: UUID) -> Int {
+        guard activeAreas.contains(where: { $0.id == areaID }) else { return 0 }
+        let containerIDs = containerSubtreeIDs(roots: activeContainers(inArea: areaID).map(\.id))
+        return descendantThingCount(areaIDs: [areaID], containerIDs: containerIDs)
+    }
+
+    func descendantThingCount(inContainer containerID: UUID) -> Int {
+        guard isActiveContainer(containerID) else { return 0 }
+        return descendantThingCount(containerIDs: containerSubtreeIDs(roots: [containerID]))
+    }
+
     func archiveImpact(forRoomID roomID: UUID) -> ArchiveImpactSummary {
         guard activeRooms.contains(where: { $0.id == roomID }) else { return .empty }
         let areaIDs = Set(activeAreas(in: roomID).map(\.id))
@@ -271,13 +299,11 @@ extension PlaceSnapshot {
         storageAreaCount: Int,
         containerCount: Int
     ) -> ArchiveImpactSummary {
-        let thingCount = activeThings.filter { thing in
-            switch thing.home {
-            case .room(let id): id == roomID
-            case .area(let id): areaIDs.contains(id)
-            case .container(let id): containerIDs.contains(id)
-            }
-        }.count
+        let thingCount = descendantThingCount(
+            roomID: roomID,
+            areaIDs: areaIDs,
+            containerIDs: containerIDs
+        )
         return ArchiveImpactSummary(
             storageAreaCount: storageAreaCount,
             containerCount: containerCount,
@@ -285,6 +311,20 @@ extension PlaceSnapshot {
             containsBoundQRCode: activeAreas.contains { areaIDs.contains($0.id) && $0.hasQRCode }
                 || activeContainers.contains { containerIDs.contains($0.id) && $0.hasQRCode }
         )
+    }
+
+    private func descendantThingCount(
+        roomID: UUID? = nil,
+        areaIDs: Set<UUID> = [],
+        containerIDs: Set<UUID> = []
+    ) -> Int {
+        Set(activeThings.compactMap { thing -> UUID? in
+            switch thing.home {
+            case .room(let id): return id == roomID ? thing.id : nil
+            case .area(let id): return areaIDs.contains(id) ? thing.id : nil
+            case .container(let id): return containerIDs.contains(id) ? thing.id : nil
+            }
+        }).count
     }
 
     private func home(_ destination: ThingDestination) -> ThingSnapshotHome {

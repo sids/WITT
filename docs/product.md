@@ -72,6 +72,15 @@ Creation is contextual:
 
 Storage Area details appear as secondary, noninteractive text immediately beneath the screen title rather than inside a grouped row that resembles a button.
 
+Browse collections should make each hierarchy level recognizable at a glance:
+
+- Rooms use two-column landscape tiles with a left icon, a two-line name, and the total number of descendant Things.
+- Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right.
+- Things use two-column square photo tiles with the name in a restrained translucent bottom overlay.
+- Containers use two-column square photo tiles with centered name and descendant Thing count in a restrained translucent overlay.
+
+Counts include active Things nested anywhere beneath the displayed Room, Storage Area, or Container. Missing photos use clear system-image fallbacks. These layouts belong to Browse; Find remains optimized for scanning search results.
+
 ## Find Loop
 
 Find is a dedicated search tab. Before a query, it lists all active Things. Search matches Thing names, keywords, and every component of the location path. A result shows the Thing and its location; opening it shows the photo, full location, keywords, and notes, with an edit action. The core loop is simple: search for what you remember, recognize the Thing, read where it is, and navigate the physical hierarchy if more context is needed.
