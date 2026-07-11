@@ -4,6 +4,7 @@ import UIKit
 struct BrowseView: View {
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
+    let onPrintQRCodes: () -> Void
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
@@ -18,12 +19,13 @@ struct BrowseView: View {
                         description: Text("Add a Place to start cataloguing your things.")
                     )
                     .navigationTitle("Browse")
+                    .toolbar { BrowseToolbar(places: [], onSharePlace: onSharePlace, onPrintQRCodes: onPrintQRCodes) }
                 }
             } else if horizontalSizeClass == .regular {
-                BrowseSplitView(store: store, onSharePlace: onSharePlace)
+                BrowseSplitView(store: store, onSharePlace: onSharePlace, onPrintQRCodes: onPrintQRCodes)
             } else {
                 NavigationStack {
-                    PlaceListView(store: store, onSharePlace: onSharePlace)
+                    PlaceListView(store: store, onSharePlace: onSharePlace, onPrintQRCodes: onPrintQRCodes)
                         .navigationDestination(for: RoomSnapshot.self) { room in
                             if let place = store.activePlaces.first(where: { $0.id == room.placeID }) {
                                 RoomDetailView(store: store, place: place, room: room)
@@ -38,6 +40,7 @@ struct BrowseView: View {
 private struct BrowseSplitView: View {
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
+    let onPrintQRCodes: () -> Void
     @State private var selectedRoom: RoomSnapshot?
 
     var body: some View {
@@ -55,7 +58,7 @@ private struct BrowseSplitView: View {
                 }
             }
             .navigationTitle("Browse")
-            .toolbar { SharePlaceToolbar(places: store.activePlaces, onSharePlace: onSharePlace) }
+            .toolbar { BrowseToolbar(places: store.activePlaces, onSharePlace: onSharePlace, onPrintQRCodes: onPrintQRCodes) }
         } detail: {
             NavigationStack {
                 if
@@ -89,6 +92,7 @@ private struct BrowseSplitView: View {
 private struct PlaceListView: View {
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
+    let onPrintQRCodes: () -> Void
 
     var body: some View {
         List(store.activePlaces) { place in
@@ -101,17 +105,25 @@ private struct PlaceListView: View {
             }
         }
         .navigationTitle("Browse")
-        .toolbar { SharePlaceToolbar(places: store.activePlaces, onSharePlace: onSharePlace) }
+        .toolbar { BrowseToolbar(places: store.activePlaces, onSharePlace: onSharePlace, onPrintQRCodes: onPrintQRCodes) }
         .refreshable { await store.reload() }
         .accessibilityIdentifier("browse.placeList")
     }
 }
 
-private struct SharePlaceToolbar: ToolbarContent {
+private struct BrowseToolbar: ToolbarContent {
     let places: [PlaceSnapshot]
     let onSharePlace: (UUID) -> Void
+    let onPrintQRCodes: () -> Void
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button(action: onPrintQRCodes) {
+                Image(systemName: "qrcode")
+            }
+            .help("Print QR Labels")
+            .accessibilityLabel("Print QR Labels")
+        }
         ToolbarItem(placement: .primaryAction) {
             if let onlyPlace = places.first, places.count == 1 {
                 Button {
@@ -269,6 +281,6 @@ private struct ThingThumbnail: View {
 #Preview("Browse") {
     let persistence = PersistenceController.inMemory()
     let store = CatalogStore(persistence: persistence)
-    BrowseView(store: store, onSharePlace: { _ in })
+    BrowseView(store: store, onSharePlace: { _ in }, onPrintQRCodes: {})
         .task { await store.bootstrap() }
 }

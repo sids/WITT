@@ -60,16 +60,18 @@ Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
-The repo now contains the second integrated implementation milestone:
+The repo now contains the third integrated implementation milestone:
 
 - The Browse, Search, Thing detail, known-QR add Thing, and unknown-QR attach/create flows now use immutable snapshots from `CoreDataCatalogRepository`; `DemoInventoryStore` has been removed.
 - Real AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, and duplicate suppression. Scanned known destinations and unknown tokens are preserved through routing.
 - Camera and Photos picker adapters normalize orientation, strip metadata, cap full images at 2048 px, create 320 px thumbnails, and persist explicit `PhotoAsset` records.
 - The confirmed `iCloud.in.sids.witt` container, iCloud/remote-notification entitlements, private/shared Core Data stores, Place-rooted read/write sharing UI, and invitation acceptance are wired.
 - The one-screen create-and-attach flow can atomically create or select a Room, Storage Area, and Container before binding a scanned QR code.
-- The `wittTests` target has 49 passing simulator tests covering persistence, containment, QR routing/scanning, photo normalization, AI helpers, and Place sharing helpers.
+- Printable random QR sheets support A4 and US Letter, two label styles, crisp high-contrast codes, Quick Look preview, and the native share/print flow without persisting unbound tokens.
+- Explicit repository and store contracts now cover manual create, edit, same-Place move, photo replacement/removal, and cascading archive for Place, Room, Storage Area, Container, and Thing. Presentation helpers reject inactive ancestry and invalid cross-Place options; management UI is not implemented yet.
+- The `wittTests` target has 70 passing simulator tests covering persistence, containment and management mutations, QR routing/scanning/printing, photo normalization, AI helpers, presentation behavior, and Place sharing helpers.
 
-The production UI is persistence-backed, but AI labeling still uses the injected deterministic mock because provider credentials and runtime configuration are not yet defined. Printable QR-sheet PDF generation and broader add/edit/archive management screens are also not implemented. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
+The production UI is persistence-backed, but AI labeling still uses the injected deterministic mock because provider credentials and runtime configuration are not yet defined. Broader management forms and navigation remain design-review work before implementation. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
 ## Working Model For Codex Threads
 

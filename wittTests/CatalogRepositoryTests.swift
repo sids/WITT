@@ -279,6 +279,336 @@ final class CatalogRepositoryTests: XCTestCase {
         }
     }
 
+    func testCreateAndUpdateEveryEntityNormalizesTextAndSupportsSamePlaceMoves() async throws {
+        let (repository, _) = makeRepository()
+        let place = try await repository.createPlace(.init(
+            name: "  Lake House  ", notes: "  Weekend storage.  "
+        ))
+        let firstRoom = try await repository.createRoom(.init(placeID: place.id, name: "  Entry  "))
+        let secondRoom = try await repository.createRoom(.init(placeID: place.id, name: " Garage "))
+        let area = try await repository.createArea(.init(
+            roomID: firstRoom.id, name: "  Upper Shelf  ", detail: "  Near door.  "
+        ))
+        let container = try await repository.createContainer(.init(
+            name: "  Blue Tote  ", detail: "   ", destination: .area(area.id)
+        ))
+        let thing = try await repository.saveThing(
+            .init(name: " Extension Cord ", keywords: [" Power "]), to: .container(container.id)
+        )
+
+        XCTAssertEqual(place.name, "Lake House")
+        XCTAssertEqual(place.notes, "Weekend storage.")
+        XCTAssertEqual(firstRoom.name, "Entry")
+        XCTAssertEqual(area.name, "Upper Shelf")
+        XCTAssertEqual(area.detail, "Near door.")
+        XCTAssertEqual(container.name, "Blue Tote")
+        XCTAssertNil(container.detail)
+
+        let updatedPlace = try await repository.updatePlace(
+            id: place.id, with: .init(name: "  Cabin  ", notes: "   ")
+        )
+        let updatedRoom = try await repository.updateRoom(
+            id: firstRoom.id, with: .init(name: "  Mudroom  ")
+        )
+        let updatedArea = try await repository.updateArea(
+            id: area.id,
+            with: .init(name: "  Shelving  ", detail: "  Metal unit  ", roomID: secondRoom.id)
+        )
+        let updatedContainer = try await repository.updateContainer(
+            id: container.id,
+            with: .init(name: "  Cord Tote  ", detail: "  Heavy  ", destination: .room(secondRoom.id))
+        )
+        let updatedThing = try await repository.updateThing(
+            id: thing.id,
+            with: .init(
+                name: "  Outdoor Cord  ",
+                keywords: [" Power ", "power", " Garden Gear "],
+                notes: "   ",
+                destination: .area(updatedArea.id)
+            )
+        )
+
+        XCTAssertEqual(updatedPlace.name, "Cabin")
+        XCTAssertNil(updatedPlace.notes)
+        XCTAssertEqual(updatedRoom.name, "Mudroom")
+        XCTAssertEqual(updatedArea.name, "Shelving")
+        XCTAssertEqual(updatedArea.detail, "Metal unit")
+        XCTAssertEqual(updatedArea.roomID, secondRoom.id)
+        XCTAssertEqual(updatedContainer.name, "Cord Tote")
+        XCTAssertEqual(updatedContainer.detail, "Heavy")
+        XCTAssertEqual(updatedContainer.parent, .room(secondRoom.id))
+        XCTAssertEqual(updatedThing.name, "Outdoor Cord")
+        XCTAssertEqual(updatedThing.keywords, ["Garden Gear", "Power"])
+        XCTAssertNil(updatedThing.notes)
+        XCTAssertEqual(updatedThing.home, .area(updatedArea.id))
+        XCTAssertNotNil(updatedPlace.updatedAt)
+        XCTAssertNotNil(updatedThing.updatedAt)
+    }
+
+    func testMovesRejectMissingArchivedAndCrossPlaceDestinations() async throws {
+        let (repository, _) = makeRepository()
+        let firstPlace = try await repository.createPlace(.init(name: "First"))
+        let firstRoom = try await repository.createRoom(.init(placeID: firstPlace.id, name: "Room"))
+        let firstArea = try await repository.createArea(.init(roomID: firstRoom.id, name: "Area"))
+        let firstContainer = try await repository.createContainer(.init(
+            name: "Container", destination: .area(firstArea.id)
+        ))
+        let thing = try await repository.saveThing(.init(name: "Thing"), to: .area(firstArea.id))
+
+        let secondPlace = try await repository.createPlace(.init(name: "Second"))
+        let secondRoom = try await repository.createRoom(.init(placeID: secondPlace.id, name: "Other Room"))
+        let secondArea = try await repository.createArea(.init(roomID: secondRoom.id, name: "Other Area"))
+
+        await assertRepositoryError(.crossPlaceMove) {
+            _ = try await repository.updateArea(
+                id: firstArea.id, with: .init(name: "Area", roomID: secondRoom.id)
+            )
+        }
+        await assertRepositoryError(.crossPlaceMove) {
+            _ = try await repository.updateContainer(
+                id: firstContainer.id,
+                with: .init(name: "Container", destination: .area(secondArea.id))
+            )
+        }
+        await assertRepositoryError(.crossPlaceMove) {
+            _ = try await repository.updateThing(
+                id: thing.id, with: .init(name: "Thing", destination: .area(secondArea.id))
+            )
+        }
+        await assertRepositoryError(.destinationNotFound) {
+            _ = try await repository.createContainer(.init(
+                name: "Missing", destination: .room(UUID())
+            ))
+        }
+
+        _ = try await repository.archiveArea(id: firstArea.id)
+        await assertRepositoryError(.destinationNotFound) {
+            _ = try await repository.saveThing(.init(name: "Nope"), to: .area(firstArea.id))
+        }
+        await assertRepositoryError(.destinationNotFound) {
+            _ = try await repository.createContainer(.init(
+                name: "Nope", destination: .area(firstArea.id)
+            ))
+        }
+    }
+
+    func testThingAndContainerMovesKeepExactlyOneHomeAndParent() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let room = try XCTUnwrap(place.rooms.first { $0.name == "Garage" })
+        let area = try XCTUnwrap(place.areas.first { $0.roomID == room.id })
+        let outer = try await repository.createContainer(.init(name: "Outer", destination: .room(room.id)))
+        let inner = try await repository.createContainer(.init(name: "Inner", destination: .container(outer.id)))
+        let thing = try await repository.saveThing(.init(name: "Meter"), to: .room(room.id))
+
+        _ = try await repository.updateContainer(
+            id: inner.id, with: .init(name: "Inner", destination: .area(area.id))
+        )
+        _ = try await repository.updateThing(
+            id: thing.id, with: .init(name: "Meter", destination: .container(inner.id))
+        )
+
+        let context = persistence.newBackgroundContext(author: "witt.catalog.exactly-one")
+        try await context.perform {
+            let storedContainer: Container = try Self.fetch(id: inner.id, entity: "Container", in: context)
+            XCTAssertEqual([
+                storedContainer.parentRoom, storedContainer.parentArea, storedContainer.parentContainer
+            ].compactMap { $0 }.count, 1)
+            let storedThing: Thing = try Self.fetch(id: thing.id, entity: "Thing", in: context)
+            XCTAssertEqual([
+                storedThing.homeRoom, storedThing.homeArea, storedThing.homeContainer
+            ].compactMap { $0 }.count, 1)
+            XCTAssertNoThrow(try ManagedObjectDomainValidator.validate(storedContainer))
+            XCTAssertNoThrow(try ManagedObjectDomainValidator.validate(storedThing))
+        }
+    }
+
+    func testContainerCycleIsRejectedAndRolledBack() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let parent = try await repository.createContainer(.init(name: "Parent", destination: .area(area.id)))
+        let child = try await repository.createContainer(.init(name: "Child", destination: .container(parent.id)))
+
+        await assertRepositoryError(.containerCycle) {
+            _ = try await repository.updateContainer(
+                id: parent.id,
+                with: .init(name: "Changed but rolled back", destination: .container(child.id))
+            )
+        }
+
+        let places = try await repository.fetchPlaces()
+        let fetched = try XCTUnwrap(places.first { $0.id == place.id })
+        let unchanged = try XCTUnwrap(fetched.containers.first { $0.id == parent.id })
+        XCTAssertEqual(unchanged.name, "Parent")
+        XCTAssertEqual(unchanged.parent, .area(area.id))
+    }
+
+    func testPhotoReplaceAndRemoveDeleteObsoleteAssets() async throws {
+        let (repository, persistence) = makeRepository()
+        let firstPhoto = Self.photo(bytes: [0x01, 0x02])
+        let secondPhoto = Self.photo(bytes: [0x03, 0x04, 0x05])
+        let place = try await repository.createPlace(.init(name: "Home", photo: firstPhoto))
+        let firstPhotoID = try XCTUnwrap(place.primaryPhoto?.id)
+
+        let replaced = try await repository.updatePlace(
+            id: place.id,
+            with: .init(name: "Home", photo: .replace(secondPhoto))
+        )
+        XCTAssertNotEqual(replaced.primaryPhoto?.id, firstPhotoID)
+        XCTAssertEqual(replaced.primaryPhoto?.data, secondPhoto.jpegData)
+        try await assertPhotoAssets(in: persistence, expectedCount: 1, missingID: firstPhotoID)
+
+        await assertRepositoryError(.invalidDraft) {
+            _ = try await repository.updatePlace(
+                id: place.id,
+                with: .init(
+                    name: "This name must roll back",
+                    photo: .replace(.init(
+                        jpegData: Data(),
+                        thumbnailJPEGData: Data(),
+                        dimensions: .init(width: 0, height: 0),
+                        source: .camera
+                    ))
+                )
+            )
+        }
+        let placesAfterFailedReplacement = try await repository.fetchPlaces()
+        let afterFailedReplacement = try XCTUnwrap(
+            placesAfterFailedReplacement.first { $0.id == place.id }
+        )
+        XCTAssertEqual(afterFailedReplacement.name, "Home")
+        XCTAssertEqual(afterFailedReplacement.primaryPhoto?.id, replaced.primaryPhoto?.id)
+        try await assertPhotoAssets(in: persistence, expectedCount: 1)
+
+        let replacementID = try XCTUnwrap(replaced.primaryPhoto?.id)
+        let removed = try await repository.updatePlace(
+            id: place.id, with: .init(name: "Home", photo: .remove)
+        )
+        XCTAssertNil(removed.primaryPhoto)
+        try await assertPhotoAssets(in: persistence, expectedCount: 0, missingID: replacementID)
+    }
+
+    func testArchivePreservesQRCodeAndPhotoAndResolutionNeedsRepair() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let token = try QRToken.generate()
+        _ = try await repository.bindQRCode(.init(
+            token: token, target: .area(QRTargetID(rawValue: area.id))
+        ))
+        _ = try await repository.updateArea(
+            id: area.id,
+            with: .init(
+                name: area.name,
+                roomID: area.roomID,
+                photo: .replace(Self.photo(bytes: [0x0A]))
+            )
+        )
+
+        let archived = try await repository.archiveArea(id: area.id)
+        XCTAssertNotNil(archived.archivedAt)
+        XCTAssertNotNil(archived.primaryPhoto)
+        XCTAssertTrue(archived.hasQRCode)
+        guard case .needsRepair(let repair) = try await repository.resolve(token) else {
+            return XCTFail("Expected archived QR target to need repair")
+        }
+        XCTAssertEqual(repair.reason, .missingTarget)
+
+        let context = persistence.newBackgroundContext(author: "witt.catalog.archive-qr")
+        try await context.perform {
+            let rows = try context.fetch(NSFetchRequest<QRCode>(entityName: "QRCode"))
+            XCTAssertEqual(rows.count, 1)
+            XCTAssertEqual(rows.first?.area?.id, area.id)
+            XCTAssertEqual(try context.count(for: NSFetchRequest<PhotoAsset>(entityName: "PhotoAsset")), 1)
+        }
+    }
+
+    func testArchiveCascadesThroughSelectedSubtreeAndEveryEntityCanBeArchived() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let room = try XCTUnwrap(place.rooms.first { $0.name == "Hall Closet" })
+        let area = try XCTUnwrap(place.areas.first { $0.roomID == room.id })
+        let container = try await repository.createContainer(.init(name: "Outer", destination: .area(area.id)))
+        let child = try await repository.createContainer(.init(name: "Inner", destination: .container(container.id)))
+        let thing = try await repository.saveThing(.init(name: "Gloves"), to: .container(child.id))
+
+        let archivedRoom = try await repository.archiveRoom(id: room.id)
+        let places = try await repository.fetchPlaces()
+        let fetched = try XCTUnwrap(places.first { $0.id == place.id })
+        XCTAssertNotNil(archivedRoom.archivedAt)
+        XCTAssertNotNil(fetched.areas.first { $0.id == area.id }?.archivedAt)
+        XCTAssertNotNil(fetched.containers.first { $0.id == container.id }?.archivedAt)
+        XCTAssertNotNil(fetched.containers.first { $0.id == child.id }?.archivedAt)
+        XCTAssertNotNil(fetched.things.first { $0.id == thing.id }?.archivedAt)
+
+        let originalThingArchiveDate = try XCTUnwrap(
+            fetched.things.first { $0.id == thing.id }?.archivedAt
+        )
+        _ = try await repository.archivePlace(id: place.id)
+        let placesAfterPlaceArchive = try await repository.fetchPlaces()
+        let refetchedPlace = try XCTUnwrap(
+            placesAfterPlaceArchive.first { $0.id == place.id }
+        )
+        XCTAssertEqual(
+            refetchedPlace.things.first { $0.id == thing.id }?.archivedAt,
+            originalThingArchiveDate
+        )
+
+        let separateActivePlace = try await repository.createPlace(.init(name: "Still Active"))
+        let activeRoom = try await repository.createRoom(.init(
+            placeID: separateActivePlace.id,
+            name: "Room"
+        ))
+        let loneArea = try await repository.createArea(.init(roomID: activeRoom.id, name: "Lone Area"))
+        let archivedArea = try await repository.archiveArea(id: loneArea.id)
+        XCTAssertNotNil(archivedArea.archivedAt)
+        let loneContainer = try await repository.createContainer(.init(
+            name: "Lone Container", destination: .room(activeRoom.id)
+        ))
+        let archivedContainer = try await repository.archiveContainer(id: loneContainer.id)
+        XCTAssertNotNil(archivedContainer.archivedAt)
+        let loneThing = try await repository.saveThing(.init(name: "Lone Thing"), to: .room(activeRoom.id))
+        let archivedThing = try await repository.archiveThing(id: loneThing.id)
+        XCTAssertNotNil(archivedThing.archivedAt)
+
+        let separatePlace = try await repository.createPlace(.init(name: "Archive Me"))
+        let separateRoom = try await repository.createRoom(.init(placeID: separatePlace.id, name: "Room"))
+        _ = try await repository.createArea(.init(roomID: separateRoom.id, name: "Area"))
+        let archivedPlace = try await repository.archivePlace(id: separatePlace.id)
+        XCTAssertNotNil(archivedPlace.archivedAt)
+        XCTAssertTrue(archivedPlace.rooms.allSatisfy { $0.archivedAt != nil })
+        XCTAssertTrue(archivedPlace.areas.allSatisfy { $0.archivedAt != nil })
+    }
+
+    func testNewDescendantsUseTheirPlacesPersistentStore() async throws {
+        let (repository, persistence) = makeRepository()
+        let place = try await repository.createPlace(.init(name: "Home"))
+        let room = try await repository.createRoom(.init(placeID: place.id, name: "Room"))
+        let area = try await repository.createArea(.init(
+            roomID: room.id, name: "Area", photo: Self.photo(bytes: [0x01])
+        ))
+        let container = try await repository.createContainer(.init(
+            name: "Container", destination: .area(area.id), photo: Self.photo(bytes: [0x02])
+        ))
+        let thing = try await repository.saveThing(
+            .init(name: "Thing", keywords: ["Keyword"], photo: Self.photo(bytes: [0x03])),
+            to: .container(container.id)
+        )
+
+        let context = persistence.newBackgroundContext(author: "witt.catalog.store-assignment")
+        try await context.perform {
+            let storedPlace: Place = try Self.fetch(id: place.id, entity: "Place", in: context)
+            let expectedStore = try XCTUnwrap(storedPlace.objectID.persistentStore)
+            let objects: [NSManagedObject] = [
+                try Self.fetch(id: room.id, entity: "Room", in: context) as Room,
+                try Self.fetch(id: area.id, entity: "Area", in: context) as Area,
+                try Self.fetch(id: container.id, entity: "Container", in: context) as Container,
+                try Self.fetch(id: thing.id, entity: "Thing", in: context) as Thing
+            ]
+            XCTAssertTrue(objects.allSatisfy { $0.objectID.persistentStore === expectedStore })
+            let photos = try context.fetch(NSFetchRequest<PhotoAsset>(entityName: "PhotoAsset"))
+            let keywords = try context.fetch(NSFetchRequest<ThingKeyword>(entityName: "ThingKeyword"))
+            XCTAssertTrue((photos + keywords).allSatisfy { $0.objectID.persistentStore === expectedStore })
+        }
+    }
+
     private func makeRepository() -> (CoreDataCatalogRepository, PersistenceController) {
         let persistence = PersistenceController.inMemory()
         return (CoreDataCatalogRepository(persistenceController: persistence), persistence)
@@ -360,5 +690,41 @@ final class CatalogRepositoryTests: XCTestCase {
 
     private static func insert<T: NSManagedObject>(_ entity: String, into context: NSManagedObjectContext) -> T {
         NSEntityDescription.insertNewObject(forEntityName: entity, into: context) as! T
+    }
+
+    private static func photo(bytes: [UInt8]) -> NormalizedPhoto {
+        NormalizedPhoto(
+            jpegData: Data(bytes),
+            thumbnailJPEGData: Data(bytes.prefix(1)),
+            dimensions: PhotoDimensions(width: 20, height: 10),
+            source: .camera
+        )
+    }
+
+    private func assertRepositoryError(
+        _ expected: CatalogRepositoryError,
+        operation: () async throws -> Void
+    ) async {
+        do {
+            try await operation()
+            XCTFail("Expected \(expected)")
+        } catch {
+            XCTAssertEqual(error as? CatalogRepositoryError, expected)
+        }
+    }
+
+    private func assertPhotoAssets(
+        in persistence: PersistenceController,
+        expectedCount: Int,
+        missingID: UUID? = nil
+    ) async throws {
+        let context = persistence.newBackgroundContext(author: "witt.catalog.photo-count")
+        try await context.perform {
+            let photos = try context.fetch(NSFetchRequest<PhotoAsset>(entityName: "PhotoAsset"))
+            XCTAssertEqual(photos.count, expectedCount)
+            if let missingID {
+                XCTAssertFalse(photos.contains { $0.id == missingID })
+            }
+        }
     }
 }

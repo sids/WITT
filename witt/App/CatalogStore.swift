@@ -26,7 +26,7 @@ final class CatalogStore: ObservableObject {
     }
 
     var things: [ThingSnapshot] {
-        activePlaces.flatMap(\.things).filter { $0.archivedAt == nil }
+        activePlaces.flatMap(\.activeThings)
     }
 
     var activePlaces: [PlaceSnapshot] {
@@ -35,15 +35,71 @@ final class CatalogStore: ObservableObject {
 
     var defaultThingDestination: ThingDestination? {
         guard let place = activePlaces.first else { return nil }
-        if let container = place.containers.first(where: { $0.archivedAt == nil }) {
+        if let container = place.activeContainers.first {
             return .container(container.id)
         }
-        if let area = place.areas.first(where: { $0.archivedAt == nil }) {
+        if let area = place.activeAreas.first {
             return .area(area.id)
         }
-        return place.rooms.first(where: { $0.archivedAt == nil }).map {
+        return place.activeRooms.first.map {
             .room($0.id)
         }
+    }
+
+    func createPlace(_ draft: CreatePlaceDraft) async -> PlaceSnapshot? {
+        await performMutation { try await repository.createPlace(draft) }
+    }
+
+    func createRoom(_ draft: CreateRoomDraft) async -> RoomSnapshot? {
+        await performMutation { try await repository.createRoom(draft) }
+    }
+
+    func createArea(_ draft: CreateAreaDraft) async -> AreaSnapshot? {
+        await performMutation { try await repository.createArea(draft) }
+    }
+
+    func createContainer(_ draft: CreateContainerDraft) async -> ContainerSnapshot? {
+        await performMutation { try await repository.createContainer(draft) }
+    }
+
+    func updatePlace(id: UUID, with draft: UpdatePlaceDraft) async -> PlaceSnapshot? {
+        await performMutation { try await repository.updatePlace(id: id, with: draft) }
+    }
+
+    func updateRoom(id: UUID, with draft: UpdateRoomDraft) async -> RoomSnapshot? {
+        await performMutation { try await repository.updateRoom(id: id, with: draft) }
+    }
+
+    func updateArea(id: UUID, with draft: UpdateAreaDraft) async -> AreaSnapshot? {
+        await performMutation { try await repository.updateArea(id: id, with: draft) }
+    }
+
+    func updateContainer(id: UUID, with draft: UpdateContainerDraft) async -> ContainerSnapshot? {
+        await performMutation { try await repository.updateContainer(id: id, with: draft) }
+    }
+
+    func updateThing(id: UUID, with draft: UpdateThingDraft) async -> ThingSnapshot? {
+        await performMutation { try await repository.updateThing(id: id, with: draft) }
+    }
+
+    func archivePlace(id: UUID) async -> PlaceSnapshot? {
+        await performMutation { try await repository.archivePlace(id: id) }
+    }
+
+    func archiveRoom(id: UUID) async -> RoomSnapshot? {
+        await performMutation { try await repository.archiveRoom(id: id) }
+    }
+
+    func archiveArea(id: UUID) async -> AreaSnapshot? {
+        await performMutation { try await repository.archiveArea(id: id) }
+    }
+
+    func archiveContainer(id: UUID) async -> ContainerSnapshot? {
+        await performMutation { try await repository.archiveContainer(id: id) }
+    }
+
+    func archiveThing(id: UUID) async -> ThingSnapshot? {
+        await performMutation { try await repository.archiveThing(id: id) }
     }
 
     func bootstrap() async {
@@ -142,5 +198,18 @@ final class CatalogStore: ObservableObject {
     private func reloadCatalog() async throws {
         places = try await repository.fetchPlaces()
         unassignedQRCodeTargets = try await repository.unassignedQRCodeTargets()
+    }
+
+    private func performMutation<Result>(
+        _ mutation: () async throws -> Result
+    ) async -> Result? {
+        do {
+            let result = try await mutation()
+            try await reloadCatalog()
+            return result
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
     }
 }

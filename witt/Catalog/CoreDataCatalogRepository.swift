@@ -5,12 +5,9 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     private let persistenceController: PersistenceController
     private let context: NSManagedObjectContext
 
-    public init(
-        persistenceController: PersistenceController,
-        context: NSManagedObjectContext? = nil
-    ) {
+    public init(persistenceController: PersistenceController) {
         self.persistenceController = persistenceController
-        self.context = context ?? persistenceController.newBackgroundContext(author: "witt.catalog")
+        context = persistenceController.newBackgroundContext(author: "witt.catalog")
     }
 
     public func fetchPlaces() async throws -> [PlaceSnapshot] {
@@ -46,6 +43,388 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 }
                 try context.save()
                 return try Self.snapshot(place)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func createPlace(_ draft: CreatePlaceDraft) async throws -> PlaceSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context, self] in
+            context.reset()
+            do {
+                let place: Place = Self.insert("Place", into: context)
+                place.name = try Self.requiredName(draft.name)
+                place.notes = Self.nilIfEmpty(draft.notes)
+                if let photo = draft.photo {
+                    try Self.applyPhotoMutation(.replace(photo), to: .place(place), in: context)
+                }
+                place.updatedAt = Date()
+
+                if persistenceController.usesCloudKit {
+                    for object in context.insertedObjects {
+                        try persistenceController.assign(object, to: .private)
+                    }
+                }
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(place)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func createRoom(_ draft: CreateRoomDraft) async throws -> RoomSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let place: Place = try Self.fetchActive(
+                    id: draft.placeID, entityName: "Place", in: context, notFound: .placeNotFound
+                )
+                let room: Room = Self.insert("Room", into: context)
+                room.name = try Self.requiredName(draft.name)
+                room.sortOrder = Self.nextSortOrder(
+                    in: Self.managedObjects(place.rooms, as: Room.self).map(\.sortOrder)
+                )
+                room.place = place
+                room.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(room)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func createArea(_ draft: CreateAreaDraft) async throws -> AreaSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let room: Room = try Self.fetchOne(
+                    id: draft.roomID, entityName: "Room", in: context, notFound: .roomNotFound
+                )
+                guard Self.isActive(room), let place = room.place else {
+                    throw CatalogRepositoryError.roomNotFound
+                }
+                let area: Area = Self.insert("Area", into: context)
+                area.name = try Self.requiredName(draft.name)
+                area.detail = Self.nilIfEmpty(draft.detail)
+                area.sortOrder = Self.nextSortOrder(
+                    in: Self.managedObjects(room.areas, as: Area.self).map(\.sortOrder)
+                )
+                area.room = room
+                area.place = place
+                if let photo = draft.photo {
+                    try Self.applyPhotoMutation(.replace(photo), to: .area(area), in: context)
+                }
+                area.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(area)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func createContainer(_ draft: CreateContainerDraft) async throws -> ContainerSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let parent = try Self.fetchContainerDestination(draft.destination, in: context)
+                let container: Container = Self.insert("Container", into: context)
+                container.name = try Self.requiredName(draft.name)
+                container.detail = Self.nilIfEmpty(draft.detail)
+                container.sortOrder = Self.nextSortOrder(in: parent.childSortOrders)
+                container.place = parent.place
+                parent.apply(to: container)
+                if let photo = draft.photo {
+                    try Self.applyPhotoMutation(.replace(photo), to: .container(container), in: context)
+                }
+                container.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: parent.place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(container)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func updatePlace(id: UUID, with draft: UpdatePlaceDraft) async throws -> PlaceSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let place: Place = try Self.fetchActive(
+                    id: id, entityName: "Place", in: context, notFound: .placeNotFound
+                )
+                place.name = try Self.requiredName(draft.name)
+                place.notes = Self.nilIfEmpty(draft.notes)
+                try Self.applyPhotoMutation(draft.photo, to: .place(place), in: context)
+                place.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(place)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func updateRoom(id: UUID, with draft: UpdateRoomDraft) async throws -> RoomSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let room: Room = try Self.fetchOne(
+                    id: id, entityName: "Room", in: context, notFound: .roomNotFound
+                )
+                guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
+                room.name = try Self.requiredName(draft.name)
+                room.updatedAt = Date()
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(room)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func updateArea(id: UUID, with draft: UpdateAreaDraft) async throws -> AreaSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let area: Area = try Self.fetchOne(
+                    id: id, entityName: "Area", in: context, notFound: .areaNotFound
+                )
+                guard Self.isActive(area), let place = area.place else {
+                    throw CatalogRepositoryError.areaNotFound
+                }
+                let room: Room = try Self.fetchOne(
+                    id: draft.roomID, entityName: "Room", in: context, notFound: .destinationNotFound
+                )
+                guard Self.isActive(room) else { throw CatalogRepositoryError.destinationNotFound }
+                guard room.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+
+                area.name = try Self.requiredName(draft.name)
+                area.detail = Self.nilIfEmpty(draft.detail)
+                area.room = room
+                try Self.applyPhotoMutation(draft.photo, to: .area(area), in: context)
+                area.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(area)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func updateContainer(id: UUID, with draft: UpdateContainerDraft) async throws -> ContainerSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let container: Container = try Self.fetchOne(
+                    id: id, entityName: "Container", in: context, notFound: .containerNotFound
+                )
+                guard Self.isActive(container), let place = container.place else {
+                    throw CatalogRepositoryError.containerNotFound
+                }
+                let parent = try Self.fetchContainerDestination(draft.destination, in: context)
+                guard parent.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+                if case .container = draft.destination {
+                    do {
+                        try Self.validateContainerMove(container, to: parent)
+                    } catch DomainValidationError.containerCycle {
+                        throw CatalogRepositoryError.containerCycle
+                    }
+                }
+
+                container.name = try Self.requiredName(draft.name)
+                container.detail = Self.nilIfEmpty(draft.detail)
+                parent.apply(to: container)
+                try Self.applyPhotoMutation(draft.photo, to: .container(container), in: context)
+                container.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(container)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func updateThing(id: UUID, with draft: UpdateThingDraft) async throws -> ThingSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let thing: Thing = try Self.fetchOne(
+                    id: id, entityName: "Thing", in: context, notFound: .thingNotFound
+                )
+                guard Self.isActive(thing), let place = thing.place else {
+                    throw CatalogRepositoryError.thingNotFound
+                }
+                let home = try Self.fetchHome(draft.destination, in: context)
+                guard home.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+
+                let name = try Self.requiredName(draft.name)
+                let keywords = Self.normalizeKeywords(draft.keywords)
+                thing.name = name
+                thing.detail = Self.nilIfEmpty(draft.notes)
+                thing.homeRoom = nil
+                thing.homeArea = nil
+                thing.homeContainer = nil
+                home.apply(to: thing)
+                for keyword in Self.managedObjects(thing.keywords, as: ThingKeyword.self) {
+                    context.delete(keyword)
+                }
+                for displayValue in keywords {
+                    let keyword: ThingKeyword = Self.insert("ThingKeyword", into: context)
+                    keyword.displayValue = displayValue
+                    keyword.normalizedValue = Self.searchNormalized(displayValue)
+                    keyword.source = thing.nameSource
+                    keyword.place = place
+                    keyword.thing = thing
+                }
+                thing.searchTextNormalized = Self.searchNormalized(
+                    ([name] + keywords + [thing.detail].compactMap { $0 }).joined(separator: " ")
+                )
+                try Self.applyPhotoMutation(draft.photo, to: .thing(thing), in: context)
+                thing.updatedAt = Date()
+                Self.assignInsertions(in: context, toStoreOf: place)
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(thing)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func archivePlace(id: UUID) async throws -> PlaceSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let place: Place = try Self.fetchActive(
+                    id: id, entityName: "Place", in: context, notFound: .placeNotFound
+                )
+                let objects: [NSManagedObject] = [place]
+                    + Self.managedObjects(place.rooms, as: Room.self)
+                    + Self.managedObjects(place.areas, as: Area.self)
+                    + Self.managedObjects(place.containers, as: Container.self)
+                    + Self.managedObjects(place.things, as: Thing.self)
+                Self.archive(objects, at: Date())
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(place)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func archiveRoom(id: UUID) async throws -> RoomSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let room: Room = try Self.fetchOne(
+                    id: id, entityName: "Room", in: context, notFound: .roomNotFound
+                )
+                guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
+                Self.archive(Self.archiveSubtree(for: room), at: Date())
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(room)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func archiveArea(id: UUID) async throws -> AreaSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let area: Area = try Self.fetchOne(
+                    id: id, entityName: "Area", in: context, notFound: .areaNotFound
+                )
+                guard Self.isActive(area) else { throw CatalogRepositoryError.areaNotFound }
+                Self.archive(Self.archiveSubtree(for: area), at: Date())
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(area)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func archiveContainer(id: UUID) async throws -> ContainerSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let container: Container = try Self.fetchOne(
+                    id: id, entityName: "Container", in: context, notFound: .containerNotFound
+                )
+                guard Self.isActive(container) else { throw CatalogRepositoryError.containerNotFound }
+                Self.archive(Self.archiveSubtree(for: container), at: Date())
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(container)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func archiveThing(id: UUID) async throws -> ThingSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let thing: Thing = try Self.fetchOne(
+                    id: id, entityName: "Thing", in: context, notFound: .thingNotFound
+                )
+                guard Self.isActive(thing) else { throw CatalogRepositoryError.thingNotFound }
+                Self.archive([thing], at: Date())
+                try Self.validateChanges(in: context)
+                try context.save()
+                return try Self.snapshot(thing)
             } catch {
                 context.rollback()
                 throw error
@@ -332,6 +711,73 @@ private extension CoreDataCatalogRepository {
         }
     }
 
+    struct ContainerParentObject {
+        let objectID: NSManagedObjectID
+        let place: Place
+        let destination: ContainerDestination
+        let childSortOrders: [Int32]
+        let containerParent: Container?
+
+        func apply(to container: Container) {
+            container.parentRoom = nil
+            container.parentArea = nil
+            container.parentContainer = nil
+            switch destination {
+            case .room:
+                container.parentRoom = try? container.managedObjectContext?.existingObject(with: objectID) as? Room
+            case .area:
+                container.parentArea = try? container.managedObjectContext?.existingObject(with: objectID) as? Area
+            case .container:
+                container.parentContainer = try? container.managedObjectContext?.existingObject(with: objectID) as? Container
+            }
+        }
+    }
+
+    enum PhotoOwnerObject {
+        case place(Place)
+        case area(Area)
+        case container(Container)
+        case thing(Thing)
+
+        var place: Place? {
+            switch self {
+            case .place(let owner): owner
+            case .area(let owner): owner.place
+            case .container(let owner): owner.place
+            case .thing(let owner): owner.place
+            }
+        }
+
+        var primaryPhoto: PhotoAsset? {
+            get {
+                switch self {
+                case .place(let owner): owner.primaryPhoto
+                case .area(let owner): owner.primaryPhoto
+                case .container(let owner): owner.primaryPhoto
+                case .thing(let owner): owner.primaryPhoto
+                }
+            }
+            nonmutating set {
+                switch self {
+                case .place(let owner): owner.primaryPhoto = newValue
+                case .area(let owner): owner.primaryPhoto = newValue
+                case .container(let owner): owner.primaryPhoto = newValue
+                case .thing(let owner): owner.primaryPhoto = newValue
+                }
+            }
+        }
+
+        func apply(to photo: PhotoAsset) {
+            switch self {
+            case .place(let owner): photo.placeOwner = owner
+            case .area(let owner): photo.areaOwner = owner
+            case .container(let owner): photo.containerOwner = owner
+            case .thing(let owner): photo.thingOwner = owner
+            }
+            primaryPhoto = photo
+        }
+    }
+
     struct QRTargetObject {
         let objectID: NSManagedObjectID
         let place: Place
@@ -465,6 +911,50 @@ private extension CoreDataCatalogRepository {
                 throw CatalogRepositoryError.destinationNotFound
             }
             return HomeObject(objectID: container.objectID, place: place, destination: destination)
+        }
+    }
+
+    nonisolated static func fetchContainerDestination(
+        _ destination: ContainerDestination,
+        in context: NSManagedObjectContext
+    ) throws -> ContainerParentObject {
+        switch destination {
+        case .room(let id):
+            let room: Room = try fetchOne(id: id, entityName: "Room", in: context)
+            guard isActive(room), let place = room.place else {
+                throw CatalogRepositoryError.destinationNotFound
+            }
+            return ContainerParentObject(
+                objectID: room.objectID,
+                place: place,
+                destination: destination,
+                childSortOrders: managedObjects(room.containers, as: Container.self).map(\.sortOrder),
+                containerParent: nil
+            )
+        case .area(let id):
+            let area: Area = try fetchOne(id: id, entityName: "Area", in: context)
+            guard isActive(area), let place = area.place else {
+                throw CatalogRepositoryError.destinationNotFound
+            }
+            return ContainerParentObject(
+                objectID: area.objectID,
+                place: place,
+                destination: destination,
+                childSortOrders: managedObjects(area.containers, as: Container.self).map(\.sortOrder),
+                containerParent: nil
+            )
+        case .container(let id):
+            let parent: Container = try fetchOne(id: id, entityName: "Container", in: context)
+            guard isActive(parent), let place = parent.place else {
+                throw CatalogRepositoryError.destinationNotFound
+            }
+            return ContainerParentObject(
+                objectID: parent.objectID,
+                place: place,
+                destination: destination,
+                childSortOrders: managedObjects(parent.childContainers, as: Container.self).map(\.sortOrder),
+                containerParent: parent
+            )
         }
     }
 
@@ -604,6 +1094,19 @@ private extension CoreDataCatalogRepository {
         return result
     }
 
+    nonisolated static func fetchActive<T: NSManagedObject>(
+        id: UUID,
+        entityName: String,
+        in context: NSManagedObjectContext,
+        notFound: CatalogRepositoryError
+    ) throws -> T {
+        let object: T = try fetchOne(
+            id: id, entityName: entityName, in: context, notFound: notFound
+        )
+        guard object.value(forKey: "archivedAt") == nil else { throw notFound }
+        return object
+    }
+
     nonisolated static func fetchQRCodes(token: String, in context: NSManagedObjectContext) throws -> [QRCode] {
         let request = NSFetchRequest<QRCode>(entityName: "QRCode")
         request.predicate = NSPredicate(format: "token == %@", token)
@@ -665,6 +1168,16 @@ private extension CoreDataCatalogRepository {
         return false
     }
 
+    nonisolated static func isActive(_ thing: Thing) -> Bool {
+        guard thing.archivedAt == nil, thing.place?.archivedAt == nil else { return false }
+        let activeHomes = [
+            thing.homeRoom.map(isActive),
+            thing.homeArea.map(isActive),
+            thing.homeContainer.map(isActive)
+        ].compactMap { $0 }
+        return activeHomes.count == 1 && activeHomes[0]
+    }
+
     nonisolated static func attachTarget(for area: Area) -> QRAttachTargetSnapshot? {
         guard let id = area.id, let place = area.place, let placeID = place.id, let room = area.room else { return nil }
         return QRAttachTargetSnapshot(id: id, placeID: placeID, kind: .area, name: area.name, locationComponents: [place.name, room.name])
@@ -719,6 +1232,129 @@ private extension CoreDataCatalogRepository {
         case let qrCode as QRCode: try ManagedObjectDomainValidator.validate(qrCode)
         case let photo as PhotoAsset: try ManagedObjectDomainValidator.validate(photo)
         default: break
+        }
+    }
+
+    static func validateChanges(in context: NSManagedObjectContext) throws {
+        context.processPendingChanges()
+        let changed = context.insertedObjects.union(context.updatedObjects)
+        for object in changed where !object.isDeleted {
+            try validateInsertedObject(object)
+        }
+    }
+
+    nonisolated static func assignInsertions(in context: NSManagedObjectContext, toStoreOf place: Place) {
+        guard let store = place.objectID.persistentStore else { return }
+        for object in context.insertedObjects {
+            context.assign(object, to: store)
+        }
+    }
+
+    static func applyPhotoMutation(
+        _ mutation: PhotoMutation,
+        to owner: PhotoOwnerObject,
+        in context: NSManagedObjectContext
+    ) throws {
+        switch mutation {
+        case .unchanged:
+            return
+        case .remove:
+            if let obsolete = owner.primaryPhoto {
+                owner.primaryPhoto = nil
+                context.delete(obsolete)
+            }
+        case .replace(let draft):
+            try validatePhotoDraft(draft)
+            if let obsolete = owner.primaryPhoto {
+                owner.primaryPhoto = nil
+                context.delete(obsolete)
+            }
+            guard let place = owner.place else { throw CatalogRepositoryError.invalidStoredHierarchy }
+            let photo: PhotoAsset = insert("PhotoAsset", into: context)
+            photo.data = draft.jpegData
+            photo.thumbnailData = draft.thumbnailJPEGData
+            photo.contentType = draft.contentType.trimmingCharacters(in: .whitespacesAndNewlines)
+            photo.pixelWidth = Int32(draft.dimensions.width)
+            photo.pixelHeight = Int32(draft.dimensions.height)
+            photo.byteSize = Int64(draft.byteSize)
+            photo.kind = draft.persistenceMetadata.kind
+            photo.source = draft.source.rawValue
+            photo.capturedAt = draft.capturedAt
+            photo.place = place
+            owner.apply(to: photo)
+        }
+    }
+
+    nonisolated static func validatePhotoDraft(_ draft: NormalizedPhoto) throws {
+        guard
+            !draft.jpegData.isEmpty,
+            !draft.contentType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            draft.dimensions.width > 0,
+            draft.dimensions.height > 0,
+            draft.dimensions.width <= Int(Int32.max),
+            draft.dimensions.height <= Int(Int32.max)
+        else {
+            throw CatalogRepositoryError.invalidDraft
+        }
+    }
+
+    static func validateContainerMove(
+        _ movingContainer: Container,
+        to parent: ContainerParentObject
+    ) throws {
+        guard let proposedParent = parent.containerParent else { return }
+        var current: Container? = proposedParent
+        var seen = Set<NSManagedObjectID>()
+        while let candidate = current {
+            guard candidate !== movingContainer, seen.insert(candidate.objectID).inserted else {
+                throw DomainValidationError.containerCycle
+            }
+            current = candidate.parentContainer
+        }
+    }
+
+    nonisolated static func archiveSubtree(for room: Room) -> [NSManagedObject] {
+        let areas = managedObjects(room.areas, as: Area.self)
+        let roots = managedObjects(room.containers, as: Container.self)
+            + areas.flatMap { managedObjects($0.containers, as: Container.self) }
+        let containers = containersInSubtree(roots)
+        let things = managedObjects(room.things, as: Thing.self)
+            + areas.flatMap { managedObjects($0.things, as: Thing.self) }
+            + containers.flatMap { managedObjects($0.things, as: Thing.self) }
+        return [room] + areas + containers + things
+    }
+
+    nonisolated static func archiveSubtree(for area: Area) -> [NSManagedObject] {
+        let containers = containersInSubtree(managedObjects(area.containers, as: Container.self))
+        let things = managedObjects(area.things, as: Thing.self)
+            + containers.flatMap { managedObjects($0.things, as: Thing.self) }
+        return [area] + containers + things
+    }
+
+    nonisolated static func archiveSubtree(for container: Container) -> [NSManagedObject] {
+        let containers = containersInSubtree([container])
+        let things = containers.flatMap { managedObjects($0.things, as: Thing.self) }
+        return containers + things
+    }
+
+    nonisolated static func containersInSubtree(_ roots: [Container]) -> [Container] {
+        var result: [Container] = []
+        var pending = roots
+        var seen = Set<NSManagedObjectID>()
+        while let container = pending.popLast() {
+            guard seen.insert(container.objectID).inserted else { continue }
+            result.append(container)
+            pending.append(contentsOf: managedObjects(container.childContainers, as: Container.self))
+        }
+        return result
+    }
+
+    nonisolated static func archive(_ objects: [NSManagedObject], at date: Date) {
+        var seen = Set<NSManagedObjectID>()
+        for object in objects where seen.insert(object.objectID).inserted {
+            guard object.value(forKey: "archivedAt") == nil else { continue }
+            object.setValue(date, forKey: "archivedAt")
+            object.setValue(date, forKey: "updatedAt")
         }
     }
 

@@ -102,10 +102,157 @@ final class CatalogPresentationTests: XCTestCase {
         )
     }
 
+    func testInactiveAndMissingAncestorsSuppressDescendants() {
+        let placeID = UUID()
+        let archivedRoomID = UUID()
+        let missingRoomID = UUID()
+        let areaID = UUID()
+        let orphanAreaID = UUID()
+        let containerID = UUID()
+        let cycleA = UUID()
+        let cycleB = UUID()
+        let hiddenThingID = UUID()
+        let place = makePlace(
+            name: "Home",
+            rooms: [room(id: archivedRoomID, placeID: placeID, name: "Garage", archived: true)],
+            areas: [
+                area(id: areaID, placeID: placeID, roomID: archivedRoomID, name: "Shelf"),
+                area(id: orphanAreaID, placeID: placeID, roomID: missingRoomID, name: "Orphan")
+            ],
+            containers: [
+                container(id: containerID, placeID: placeID, name: "Box", parent: .area(areaID)),
+                container(id: cycleA, placeID: placeID, name: "Cycle A", parent: .container(cycleB)),
+                container(id: cycleB, placeID: placeID, name: "Cycle B", parent: .container(cycleA))
+            ],
+            things: [thing(id: hiddenThingID, placeID: placeID, name: "Drill", home: .container(containerID))],
+            id: placeID
+        )
+
+        XCTAssertTrue(place.activeAreas.isEmpty)
+        XCTAssertTrue(place.activeContainers.isEmpty)
+        XCTAssertTrue(place.activeThings.isEmpty)
+        XCTAssertTrue(place.thingDestinationOptions.isEmpty)
+        XCTAssertEqual(place.locationComponents(for: place.things[0]), [])
+    }
+
+    func testDestinationAndContainerParentOptionsUseFullActivePaths() {
+        let fixture = nestedFixture()
+
+        XCTAssertEqual(
+            fixture.place.thingDestinationOptions.map(\.displayPath),
+            [
+                "Home · Garage",
+                "Home · Garage · Workbench",
+                "Home · Garage · Workbench · Tool Chest",
+                "Home · Garage · Workbench · Tool Chest · Bit Case",
+                "Home · Garage · Workbench · Spare Box"
+            ]
+        )
+
+        let destinations = fixture.place.containerParentOptions(editing: fixture.outerID).map(\.destination)
+        XCTAssertTrue(destinations.contains(.room(fixture.roomID)))
+        XCTAssertTrue(destinations.contains(.area(fixture.areaID)))
+        XCTAssertTrue(destinations.contains(.container(fixture.siblingID)))
+        XCTAssertFalse(destinations.contains(.container(fixture.outerID)))
+        XCTAssertFalse(destinations.contains(.container(fixture.innerID)))
+
+        let innerDestinations = fixture.place.containerParentOptions(editing: fixture.innerID).map(\.destination)
+        XCTAssertTrue(innerDestinations.contains(.container(fixture.outerID)))
+    }
+
+    func testArchiveImpactCountsNestedDescendantsAndBoundQR() {
+        let fixture = nestedFixture(innerHasQRCode: true, withThings: true)
+
+        XCTAssertEqual(
+            fixture.place.archiveImpact(forAreaID: fixture.areaID),
+            ArchiveImpactSummary(
+                storageAreaCount: 0,
+                containerCount: 3,
+                thingCount: 2,
+                containsBoundQRCode: true
+            )
+        )
+        XCTAssertEqual(
+            fixture.place.archiveImpact(forContainerID: fixture.outerID),
+            ArchiveImpactSummary(
+                storageAreaCount: 0,
+                containerCount: 1,
+                thingCount: 2,
+                containsBoundQRCode: true
+            )
+        )
+    }
+
+    @MainActor
+    func testCreateWrapperReturnsSnapshotAndReloadsCatalog() async {
+        let store = CatalogStore(persistence: .inMemory())
+
+        let created = await store.createPlace(CreatePlaceDraft(name: "Studio"))
+
+        XCTAssertEqual(created?.name, "Studio")
+        XCTAssertEqual(store.place(id: created!.id)?.name, "Studio")
+        XCTAssertNil(store.errorMessage)
+    }
+
+    @MainActor
+    func testMutationFailurePublishesLocalizedError() async {
+        let store = CatalogStore(persistence: .inMemory())
+
+        let created = await store.createRoom(CreateRoomDraft(placeID: UUID(), name: "Office"))
+
+        XCTAssertNil(created)
+        XCTAssertEqual(store.errorMessage, CatalogRepositoryError.placeNotFound.localizedDescription)
+    }
+
+    @MainActor
+    func testEditingOptionsStayWithinTheOwningPlace() async throws {
+        let store = CatalogStore(persistence: .inMemory())
+        let createdFirstPlace = await store.createPlace(.init(name: "Home"))
+        let firstPlace = try XCTUnwrap(createdFirstPlace)
+        let createdFirstRoom = await store.createRoom(.init(
+            placeID: firstPlace.id,
+            name: "Garage"
+        ))
+        let firstRoom = try XCTUnwrap(createdFirstRoom)
+        let createdContainer = await store.createContainer(.init(
+            name: "Tool Chest",
+            destination: .room(firstRoom.id)
+        ))
+        let container = try XCTUnwrap(createdContainer)
+        let saved = await store.saveThing(
+            name: "Drill",
+            keywords: [],
+            notes: "",
+            photo: nil,
+            to: .container(container.id),
+            nameSource: "user"
+        )
+        XCTAssertTrue(saved)
+        let thing = try XCTUnwrap(store.things.first { $0.name == "Drill" })
+
+        let createdSecondPlace = await store.createPlace(.init(name: "Studio"))
+        let secondPlace = try XCTUnwrap(createdSecondPlace)
+        let createdSecondRoom = await store.createRoom(.init(
+            placeID: secondPlace.id,
+            name: "Office"
+        ))
+        let secondRoom = try XCTUnwrap(createdSecondRoom)
+
+        let containerOptions = store.containerParentOptions(editing: container.id)
+        XCTAssertTrue(containerOptions.contains { $0.destination == .room(firstRoom.id) })
+        XCTAssertFalse(containerOptions.contains { $0.destination == .room(secondRoom.id) })
+
+        let thingOptions = store.thingDestinationOptions(editing: thing.id)
+        XCTAssertTrue(thingOptions.contains { $0.destination == .room(firstRoom.id) })
+        XCTAssertFalse(thingOptions.contains { $0.destination == .room(secondRoom.id) })
+    }
+
     private func makePlace(
         name: String,
         rooms: [RoomSnapshot] = [],
         areas: [AreaSnapshot] = [],
+        containers: [ContainerSnapshot] = [],
+        things: [ThingSnapshot] = [],
         id: UUID = UUID()
     ) -> PlaceSnapshot {
         PlaceSnapshot(
@@ -118,8 +265,59 @@ final class CatalogPresentationTests: XCTestCase {
             primaryPhoto: nil,
             rooms: rooms,
             areas: areas,
-            containers: [],
-            things: []
+            containers: containers,
+            things: things
         )
+    }
+
+    private func nestedFixture(
+        innerHasQRCode: Bool = false,
+        withThings: Bool = false
+    ) -> (place: PlaceSnapshot, roomID: UUID, areaID: UUID, outerID: UUID, innerID: UUID, siblingID: UUID) {
+        let placeID = UUID()
+        let roomID = UUID()
+        let areaID = UUID()
+        let outerID = UUID()
+        let innerID = UUID()
+        let siblingID = UUID()
+        return (
+            makePlace(
+                name: "Home",
+                rooms: [room(id: roomID, placeID: placeID, name: "Garage")],
+                areas: [area(id: areaID, placeID: placeID, roomID: roomID, name: "Workbench")],
+                containers: [
+                    container(id: outerID, placeID: placeID, name: "Tool Chest", parent: .area(areaID)),
+                    container(id: innerID, placeID: placeID, name: "Bit Case", parent: .container(outerID), hasQRCode: innerHasQRCode),
+                    container(id: siblingID, placeID: placeID, name: "Spare Box", parent: .area(areaID))
+                ],
+                things: withThings ? [
+                    thing(id: UUID(), placeID: placeID, name: "Drill", home: .container(outerID)),
+                    thing(id: UUID(), placeID: placeID, name: "Bits", home: .container(innerID))
+                ] : [],
+                id: placeID
+            ), roomID, areaID, outerID, innerID, siblingID
+        )
+    }
+
+    private func room(id: UUID, placeID: UUID, name: String, archived: Bool = false) -> RoomSnapshot {
+        RoomSnapshot(id: id, placeID: placeID, name: name, sortOrder: 0, archivedAt: archived ? Date() : nil)
+    }
+
+    private func area(id: UUID, placeID: UUID, roomID: UUID, name: String) -> AreaSnapshot {
+        AreaSnapshot(id: id, placeID: placeID, roomID: roomID, name: name, detail: nil, sortOrder: 0, archivedAt: nil, primaryPhoto: nil, hasQRCode: false)
+    }
+
+    private func container(
+        id: UUID,
+        placeID: UUID,
+        name: String,
+        parent: ContainerSnapshotParent,
+        hasQRCode: Bool = false
+    ) -> ContainerSnapshot {
+        ContainerSnapshot(id: id, placeID: placeID, name: name, detail: nil, sortOrder: 0, archivedAt: nil, parent: parent, primaryPhoto: nil, hasQRCode: hasQRCode)
+    }
+
+    private func thing(id: UUID, placeID: UUID, name: String, home: ThingSnapshotHome) -> ThingSnapshot {
+        ThingSnapshot(id: id, placeID: placeID, name: name, keywords: [], notes: nil, nameSource: "user", home: home, createdAt: nil, updatedAt: nil, archivedAt: nil, primaryPhoto: nil)
     }
 }

@@ -149,6 +149,153 @@ public enum ThingDestination: Hashable, Sendable {
     case container(UUID)
 }
 
+public enum ContainerDestination: Hashable, Sendable {
+    case room(UUID)
+    case area(UUID)
+    case container(UUID)
+}
+
+public enum PhotoMutation: Hashable, Sendable {
+    case unchanged
+    case replace(NormalizedPhoto)
+    case remove
+}
+
+public struct CreatePlaceDraft: Hashable, Sendable {
+    public let name: String
+    public let notes: String?
+    public let photo: NormalizedPhoto?
+
+    public init(name: String, notes: String? = nil, photo: NormalizedPhoto? = nil) {
+        self.name = name
+        self.notes = notes
+        self.photo = photo
+    }
+}
+
+public struct UpdatePlaceDraft: Hashable, Sendable {
+    public let name: String
+    public let notes: String?
+    public let photo: PhotoMutation
+
+    public init(name: String, notes: String? = nil, photo: PhotoMutation = .unchanged) {
+        self.name = name
+        self.notes = notes
+        self.photo = photo
+    }
+}
+
+public struct CreateRoomDraft: Hashable, Sendable {
+    public let placeID: UUID
+    public let name: String
+
+    public init(placeID: UUID, name: String) {
+        self.placeID = placeID
+        self.name = name
+    }
+}
+
+public struct UpdateRoomDraft: Hashable, Sendable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+public struct CreateAreaDraft: Hashable, Sendable {
+    public let roomID: UUID
+    public let name: String
+    public let detail: String?
+    public let photo: NormalizedPhoto?
+
+    public init(roomID: UUID, name: String, detail: String? = nil, photo: NormalizedPhoto? = nil) {
+        self.roomID = roomID
+        self.name = name
+        self.detail = detail
+        self.photo = photo
+    }
+}
+
+public struct UpdateAreaDraft: Hashable, Sendable {
+    public let name: String
+    public let detail: String?
+    public let roomID: UUID
+    public let photo: PhotoMutation
+
+    public init(
+        name: String,
+        detail: String? = nil,
+        roomID: UUID,
+        photo: PhotoMutation = .unchanged
+    ) {
+        self.name = name
+        self.detail = detail
+        self.roomID = roomID
+        self.photo = photo
+    }
+}
+
+public struct CreateContainerDraft: Hashable, Sendable {
+    public let name: String
+    public let detail: String?
+    public let destination: ContainerDestination
+    public let photo: NormalizedPhoto?
+
+    public init(
+        name: String,
+        detail: String? = nil,
+        destination: ContainerDestination,
+        photo: NormalizedPhoto? = nil
+    ) {
+        self.name = name
+        self.detail = detail
+        self.destination = destination
+        self.photo = photo
+    }
+}
+
+public struct UpdateContainerDraft: Hashable, Sendable {
+    public let name: String
+    public let detail: String?
+    public let destination: ContainerDestination
+    public let photo: PhotoMutation
+
+    public init(
+        name: String,
+        detail: String? = nil,
+        destination: ContainerDestination,
+        photo: PhotoMutation = .unchanged
+    ) {
+        self.name = name
+        self.detail = detail
+        self.destination = destination
+        self.photo = photo
+    }
+}
+
+public struct UpdateThingDraft: Hashable, Sendable {
+    public let name: String
+    public let keywords: [String]
+    public let notes: String?
+    public let destination: ThingDestination
+    public let photo: PhotoMutation
+
+    public init(
+        name: String,
+        keywords: [String] = [],
+        notes: String? = nil,
+        destination: ThingDestination,
+        photo: PhotoMutation = .unchanged
+    ) {
+        self.name = name
+        self.keywords = keywords
+        self.notes = notes
+        self.destination = destination
+        self.photo = photo
+    }
+}
+
 public struct ReviewedThingDraft: Hashable, Sendable {
     public let name: String
     public let keywords: [String]
@@ -181,6 +328,13 @@ public enum CatalogRepositoryError: Error, Equatable, Sendable {
     case selectionDoesNotBelongToParent
     case missingIdentity
     case invalidStoredHierarchy
+    case placeNotFound
+    case roomNotFound
+    case areaNotFound
+    case containerNotFound
+    case thingNotFound
+    case crossPlaceMove
+    case containerCycle
 }
 
 extension CatalogRepositoryError: LocalizedError {
@@ -204,6 +358,20 @@ extension CatalogRepositoryError: LocalizedError {
             "Some catalog data is missing its identity."
         case .invalidStoredHierarchy:
             "Some catalog data has an invalid storage hierarchy."
+        case .placeNotFound:
+            "That Place is no longer available."
+        case .roomNotFound:
+            "That Room is no longer available."
+        case .areaNotFound:
+            "That Storage Area is no longer available."
+        case .containerNotFound:
+            "That Container is no longer available."
+        case .thingNotFound:
+            "That Thing is no longer available."
+        case .crossPlaceMove:
+            "Storage Areas, Containers, and Things can only be moved within the same Place."
+        case .containerCycle:
+            "A Container cannot be placed inside itself or one of its descendants."
         }
     }
 }
@@ -211,6 +379,20 @@ extension CatalogRepositoryError: LocalizedError {
 public protocol CatalogRepository: QRCodeResolving {
     func fetchPlaces() async throws -> [PlaceSnapshot]
     @discardableResult func seedHomeIfNeeded() async throws -> PlaceSnapshot?
+    func createPlace(_ draft: CreatePlaceDraft) async throws -> PlaceSnapshot
+    func createRoom(_ draft: CreateRoomDraft) async throws -> RoomSnapshot
+    func createArea(_ draft: CreateAreaDraft) async throws -> AreaSnapshot
+    func createContainer(_ draft: CreateContainerDraft) async throws -> ContainerSnapshot
+    func updatePlace(id: UUID, with draft: UpdatePlaceDraft) async throws -> PlaceSnapshot
+    func updateRoom(id: UUID, with draft: UpdateRoomDraft) async throws -> RoomSnapshot
+    func updateArea(id: UUID, with draft: UpdateAreaDraft) async throws -> AreaSnapshot
+    func updateContainer(id: UUID, with draft: UpdateContainerDraft) async throws -> ContainerSnapshot
+    func updateThing(id: UUID, with draft: UpdateThingDraft) async throws -> ThingSnapshot
+    func archivePlace(id: UUID) async throws -> PlaceSnapshot
+    func archiveRoom(id: UUID) async throws -> RoomSnapshot
+    func archiveArea(id: UUID) async throws -> AreaSnapshot
+    func archiveContainer(id: UUID) async throws -> ContainerSnapshot
+    func archiveThing(id: UUID) async throws -> ThingSnapshot
     func saveThing(_ draft: ReviewedThingDraft, to destination: ThingDestination) async throws -> ThingSnapshot
     func unassignedQRCodeTargets() async throws -> [QRAttachTargetSnapshot]
     @discardableResult func bindQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding

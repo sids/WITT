@@ -13,6 +13,7 @@ struct AppShellView: View {
     @State private var presentedScan: ScanPresentation?
     @State private var pendingDemo: ScanDemo?
     @State private var sharingSheet: PlaceSharingSheet?
+    @State private var isPrintingQRCodes = false
     @State private var deepLinkAlert: DeepLinkAlert?
     @State private var isRoutingQRCode = false
     @ObservedObject private var shareAcceptanceCenter = PlaceShareAcceptanceCenter.shared
@@ -30,7 +31,11 @@ struct AppShellView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Browse", systemImage: "square.grid.2x2", value: AppTab.browse) {
-                BrowseView(store: store, onSharePlace: sharePlace)
+                BrowseView(
+                    store: store,
+                    onSharePlace: sharePlace,
+                    onPrintQRCodes: { isPrintingQRCodes = true }
+                )
             }
 
             Tab("Scan", systemImage: "qrcode.viewfinder", value: AppTab.scan) {
@@ -86,6 +91,9 @@ struct AppShellView: View {
                     )
                 }
             }
+        }
+        .sheet(isPresented: $isPrintingQRCodes) {
+            QRCodePrintingView()
         }
         .onOpenURL(perform: handleDeepLink)
         .onChange(of: store.hasLoaded) { _, loaded in
