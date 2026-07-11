@@ -71,7 +71,7 @@ The repo now contains the seventh integrated implementation milestone:
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
-Version 1.0 build 2 is available through the `WITT Internal` TestFlight group for Sid's next device review. Put all review feedback into [`docs/todo.md`](docs/todo.md) before dispatching fixes.
+Version 1.0 build 3, sourced from commit `bfd9324`, is valid and in beta testing through the `WITT Internal` TestFlight group. Put all review feedback into [`docs/todo.md`](docs/todo.md) before dispatching fixes.
 
 ## Working Model For Codex Threads
 

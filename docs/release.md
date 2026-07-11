@@ -11,12 +11,20 @@ This page records durable distribution facts and the repeatable release process.
 | Bundle ID | `in.sids.witt` |
 | CloudKit container | `iCloud.in.sids.witt` |
 | Internal TestFlight group | `WITT Internal` |
-| Current TestFlight build | 1.0 (2) |
-| Source commit | `31c0b05` |
-| App Store Connect build ID | `32aa0fa1-b951-4332-82a9-ee7e28ee5a40` |
-| Build state | Valid |
+| Current TestFlight build | 1.0 (3) |
+| Source commit | `bfd9324` |
+| App Store Connect build ID | `a0a43fff-0531-4ba5-b1d8-aa9641866d48` |
+| Build state | Valid; in beta testing |
+| Xcode / SDK | Xcode 27.0 (`27A5218g`) / iOS 27.0 |
 | Minimum OS | iOS 26 |
 | Non-exempt encryption | No |
+
+## Release History
+
+| Build | Source | App Store Connect ID | Internal state | Verification |
+| --- | --- | --- | --- | --- |
+| 1.0 (3) | `bfd9324` | `a0a43fff-0531-4ba5-b1d8-aa9641866d48` | `IN_BETA_TESTING` in `WITT Internal` | 108 simulator tests; production CloudKit/push entitlements; What to Test verified |
+| 1.0 (2) | `31c0b05` | `32aa0fa1-b951-4332-82a9-ee7e28ee5a40` | Valid in `WITT Internal` | First feedback build |
 
 ## Signing And Entitlements
 

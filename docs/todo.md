@@ -20,15 +20,7 @@ Workflow:
 
 ## Feedback Inbox
 
-- [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (2)`. Close when Sid considers the review pass complete.
-- [x] FB-009 - Sid, July 11, 2026, build `1.0 (2)`: Make Places the first screen in the Browse navigation stack. Show the list of Places as navigation choices, provide a contextual New Place action, and put Print QR Codes on this screen. Selecting a Place should push its Rooms screen; remove the current-Place picker/switcher pattern from Browse.
-- [x] FB-010 - Sid, July 11, 2026, build `1.0 (2)`: Use the Place name as the Rooms-screen title. Put Rename Place and Share Place under a standard ellipsis menu. When the Place already has an active iCloud share, show a separate Shared button immediately before the ellipsis; it opens the system sharing details and participant actions.
-- [x] FB-011 - Sid, July 11, 2026, build `1.0 (2)`: When a Place has no Rooms, show New Room as a standalone fully rounded list row, matching New Storage Area, rather than a row with only its bottom corners rounded beneath the empty state.
-- [x] FB-012 - Sid, July 11, 2026, build `1.0 (2)`: When a creation sheet opens, immediately focus its primary name field and show the keyboard. Apply this to New Place, New Room, New Storage Area, New Container, and manual New Thing.
-- [x] FB-013 - Sid, July 11, 2026, build `1.0 (2)`: Add Scan QR Code to the New Storage Area sheet. On an existing Storage Area, put Attach/Reattach QR Code in a navigation ellipsis menu and open the scanner directly. Do not show a QR-status section in Storage Area content. Render Storage Area details as secondary text directly beneath the title, not as a grouped list row that resembles a button. Define and verify safe behavior when the scanned QR is already attached elsewhere.
-- [x] FB-014 - Sid, July 11, 2026, build `1.0 (2)`: Give New Container the same optional Scan QR Code action. Existing Container screens should expose Attach/Reattach QR Code from their navigation ellipsis menu and open the same scanner flow; keep QR status out of the content layer.
-
-FB-009 through FB-014 are implemented and locally verified for the next TestFlight build. The full simulator suite passes with 108 tests; the app builds and launches on the configured iPhone simulator.
+- [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (3)`. Close when Sid considers the review pass complete.
 
 ## P0 - Release Gates
 
@@ -82,7 +74,6 @@ FB-009 through FB-014 are implemented and locally verified for the next TestFlig
 - [ ] PHOTO-001 - Profile camera and photo-library ingestion during long physical sessions; optimize normalization, thumbnails, and memory use if evidence requires it.
 - [ ] QR-003 - Decide whether `QRCode.lastScannedAt` should become maintained product metadata or be removed.
 - [ ] TEST-001 - Add focused regression tests with each feedback fix and keep the full simulator suite green.
-- [ ] TF-002 - Batch the next accepted feedback into build 3, verify it, upload it, attach it to `WITT Internal`, and update What to Test notes.
 
 ## P2 - App Store Release
 
@@ -103,3 +94,5 @@ Do not schedule these until Sid explicitly promotes them:
 - [ ] LATER-006 - Richer Container/Storage Area metadata such as kind, capacity, wall, shelf, or label hints.
 
 Build `1.0 (2)` resolved feedback FB-002 through FB-008. See [status.md](status.md) and [release.md](release.md) for the shipped state.
+
+Build `1.0 (3)` resolved feedback FB-009 through FB-014 and completed TF-002. It passed 108 simulator tests and is in internal beta testing; see [status.md](status.md) and [release.md](release.md).
