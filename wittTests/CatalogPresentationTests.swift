@@ -2,6 +2,43 @@ import XCTest
 @testable import witt
 
 final class CatalogPresentationTests: XCTestCase {
+    func testBrowseSelectionDefaultsAndStaysWithinCurrentPlace() {
+        let firstID = UUID()
+        let firstRoomID = UUID()
+        let first = makePlace(
+            name: "Home",
+            rooms: [room(id: firstRoomID, placeID: firstID, name: "Kitchen")],
+            id: firstID
+        )
+        let secondRoomID = UUID()
+        let secondID = UUID()
+        let second = makePlace(
+            name: "Studio",
+            rooms: [room(id: secondRoomID, placeID: secondID, name: "Office")],
+            id: secondID
+        )
+        var selection = BrowseSelection()
+
+        selection.reconcile(with: [first, second])
+        XCTAssertEqual(selection, BrowseSelection(placeID: first.id, roomID: firstRoomID))
+
+        selection.selectPlace(second.id, from: [first, second])
+        XCTAssertEqual(selection, BrowseSelection(placeID: second.id, roomID: secondRoomID))
+    }
+
+    func testBrowseSelectionReconcilesArchivedPlaceRoomAndEmptyCatalog() {
+        let firstID = UUID()
+        let secondID = UUID()
+        let second = makePlace(name: "Studio", id: secondID)
+        var selection = BrowseSelection(placeID: firstID, roomID: UUID())
+
+        selection.reconcile(with: [second])
+        XCTAssertEqual(selection, BrowseSelection(placeID: secondID, roomID: nil))
+
+        selection.reconcile(with: [])
+        XCTAssertEqual(selection, BrowseSelection(placeID: nil, roomID: nil))
+    }
+
     func testDestinationPathDoesNotMatchTheWrongPlace() {
         let first = makePlace(name: "Home")
         let secondID = UUID()

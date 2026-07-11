@@ -97,12 +97,6 @@ struct AppShellView: View {
         .onOpenURL(perform: handleDeepLink)
         .onChange(of: store.hasLoaded) { _, loaded in
             guard loaded else { return }
-            if
-                !store.activePlaces.isEmpty,
-                store.activePlaces.allSatisfy({ $0.activeRooms.isEmpty })
-            {
-                selectedTab = .scan
-            }
             presentPendingDemoIfPossible()
         }
         .onChange(of: store.errorMessage) { _, message in

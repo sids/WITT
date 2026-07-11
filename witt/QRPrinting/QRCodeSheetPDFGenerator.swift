@@ -19,20 +19,27 @@ struct QRCodeSheetPDFGenerator {
     ) throws -> Data {
         guard !codes.isEmpty else { throw QRCodeSheetError.invalidCount }
 
-        let bounds = CGRect(origin: .zero, size: layout.pageSize)
-        let renderer = UIGraphicsPDFRenderer(bounds: bounds)
+        let initialBounds = CGRect(origin: .zero, size: layout.pageSize(at: 0, codeCount: codes.count))
+        let renderer = UIGraphicsPDFRenderer(bounds: initialBounds)
         var generationError: QRCodeSheetError?
 
         let data = renderer.pdfData { context in
             for pageStart in stride(from: 0, to: codes.count, by: layout.codesPerPage) {
-                context.beginPage()
+                let pageIndex = pageStart / layout.codesPerPage
+                let bounds = CGRect(origin: .zero, size: layout.pageSize(at: pageIndex, codeCount: codes.count))
+                context.beginPage(withBounds: bounds, pageInfo: [:])
                 UIColor.white.setFill()
                 context.cgContext.fill(bounds)
 
                 let pageEnd = min(pageStart + layout.codesPerPage, codes.count)
                 for absoluteIndex in pageStart..<pageEnd {
-                    let pageIndex = absoluteIndex - pageStart
-                    let qrFrame = layout.qrFrame(at: pageIndex)
+                    let pageLocalIndex = absoluteIndex - pageStart
+                    let qrFrame = layout.qrFrame(at: pageLocalIndex)
+                    guard bounds.contains(qrFrame),
+                          bounds.contains(layout.identifierFrame(at: pageLocalIndex)) else {
+                        generationError = .invalidGeometry
+                        return
+                    }
                     guard let image = imageGenerator(codes[absoluteIndex].url.absoluteString, qrFrame.width) else {
                         generationError = .imageGenerationFailed(index: absoluteIndex)
                         return
@@ -57,11 +64,11 @@ struct QRCodeSheetPDFGenerator {
                         .paragraphStyle: paragraph
                     ]
                     codes[absoluteIndex].identifier.draw(
-                        in: layout.identifierFrame(at: pageIndex),
+                        in: layout.identifierFrame(at: pageLocalIndex),
                         withAttributes: attributes
                     )
                     if labelStyle == .blankLine {
-                        let frame = layout.identifierFrame(at: pageIndex)
+                        let frame = layout.identifierFrame(at: pageLocalIndex)
                         let lineY = frame.maxY - 1
                         context.cgContext.setStrokeColor(UIColor.black.cgColor)
                         context.cgContext.setLineWidth(0.75)
