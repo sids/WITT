@@ -30,7 +30,7 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 The baseline is 125 passing `wittTests` simulator tests covering persistence, containment and management mutations, selected-Place Browse restoration and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
 
-Version 1.0 build 3 is valid and in beta testing through the `WITT Internal` TestFlight group. Its source commit is `bfd9324`. See [release.md](release.md) for durable release facts and process.
+Version 1.0 build 4 is valid and in beta testing through the `WITT Internal` TestFlight group. Its source commit is `28433e3`, and its App Store Connect build ID is `54bf071a-76d5-4829-9067-326f003da172`. See [release.md](release.md) for durable release facts and process.
 
 ## Project Documents
 
