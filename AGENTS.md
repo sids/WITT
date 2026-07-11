@@ -10,6 +10,8 @@ Primary product note: Bear note titled `WITT: Where Is The Thing?`.
 
 Bear is the canonical home for WITT project docs. Every durable WITT product, planning, research, or decision note in Bear must be tagged `#projects/WITT`. Prefer titles beginning with `WITT:`. The project docs index is the Bear note titled `WITT: Project Docs Index`.
 
+The canonical actionable backlog and TestFlight feedback inbox is the Bear note titled `WITT: Todo Tracker` (note ID `386A3DBA-AE52-44A7-A5A0-1A06EBC2DCCA`). Read it before choosing or assigning work. Capture every new issue or product comment there, keep its priority and acceptance criteria current, and mark work complete only after verification. Action lists in older Bear notes are historical context and must not compete with this tracker.
+
 Use `bearcli` to read it when product context may have changed:
 
 ```sh
@@ -21,6 +23,12 @@ Use this to list project docs:
 
 ```sh
 bearcli search '#projects/WITT' --format json --fields all
+```
+
+Use this to read the current backlog directly:
+
+```sh
+bearcli cat 386A3DBA-AE52-44A7-A5A0-1A06EBC2DCCA --format json
 ```
 
 In this environment `bearcli` may need permissions outside the repo sandbox because the note lives in Bear's local app storage.
@@ -74,6 +82,8 @@ The repo now contains the fifth integrated implementation milestone:
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
+Version 1.0 build 1 is available through the `WITT Internal` TestFlight group, and Sid is actively reviewing it on device. Put all review feedback into `WITT: Todo Tracker` before dispatching fixes.
+
 ## Working Model For Codex Threads
 
 This thread acts as project manager unless Sid says otherwise.
@@ -93,6 +103,7 @@ When launching implementation or research work in separate Codex threads:
 6. Ask workers whose output should become durable project documentation to provide a Bear-ready title and summary.
 7. Read thread results before integrating or assigning dependent work.
 8. Store durable project docs in Bear with `#projects/WITT` and update `WITT: Project Docs Index` when adding a significant note.
+9. Use `WITT: Todo Tracker` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
 
 Prefer worktree threads for substantive code changes so efforts stay isolated. Use local project threads for quick read-only research or small repo inspection tasks.
 
@@ -126,8 +137,6 @@ Keep Liquid Glass out of the content layer. Express hierarchy through layout, gr
 
 For unknown QR scans, avoid unnecessary intermediate steps. Open the attach-QR screen directly. That screen should immediately show unassigned Storage Areas and Containers grouped by type. If there are no suitable unassigned targets, show a create/bind flow that starts from Room selection or creation, then Storage Area selection or creation, then either attach the QR to the selected Storage Area or select/create a Container. Do not introduce QR binding for Rooms or Things.
 
-## Open Product Questions
+## Active Work
 
-Clarify these with Sid before locking implementation:
-
-1. Validate with a real-device/two-iCloud-account spike that `PhotoAsset` binary data with external storage is shared correctly when a Place is shared.
+Do not maintain a second backlog in this file. Read `WITT: Todo Tracker` in Bear for current TestFlight feedback, release gates, product decisions, engineering work, and deferred ideas. When this file and the tracker disagree about task status or priority, the tracker wins; settled product and architecture constraints in this file still apply.
