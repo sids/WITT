@@ -118,79 +118,209 @@ enum BrowsePathRestorer {
     }
 }
 
+struct BrowseRestoredState: Equatable {
+    let selectedPlaceID: UUID?
+    let visiblePath: [BrowseRoute]
+}
+
+enum BrowseSelectionRestorer {
+    static func state(
+        for destination: BrowseRoute?,
+        preferredPlaceID: UUID? = nil,
+        in places: [PlaceSnapshot]
+    ) -> BrowseRestoredState {
+        let activePlaces = places.filter { $0.archivedAt == nil }
+        guard let fallbackPlaceID = activePlaces.first(where: { $0.id == preferredPlaceID })?.id
+            ?? activePlaces.first?.id
+        else {
+            return BrowseRestoredState(selectedPlaceID: nil, visiblePath: [])
+        }
+
+        guard
+            let fullPath = BrowsePathRestorer.path(to: destination, in: activePlaces),
+            case .place(let placeID)? = fullPath.first
+        else {
+            return BrowseRestoredState(selectedPlaceID: fallbackPlaceID, visiblePath: [])
+        }
+
+        return BrowseRestoredState(
+            selectedPlaceID: placeID,
+            visiblePath: Array(fullPath.dropFirst())
+        )
+    }
+}
+
 private struct ManagementPresentation: Identifiable {
     let id = UUID()
     let route: ManagementRoute
 }
 
 struct BrowseView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
     let onPrintQRCodes: () -> Void
+    let onScan: () -> Void
     @AppStorage("witt.browse.savedDestination.v1") private var savedDestination = Data()
+    @AppStorage("witt.browse.selectedPlaceID.v1") private var savedSelectedPlaceID = ""
     @State private var path: [BrowseRoute] = []
+    @State private var selectedPlaceID: UUID?
     @State private var hasCompletedRestoration = false
     @State private var managementPresentation: ManagementPresentation?
+    @State private var query = ""
+    @State private var isSearchPresented = false
+    @State private var hasPresentedEmptyPlaceCreation = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if store.isLoading && store.activePlaces.isEmpty {
-                    ProgressView("Loading Places")
-                } else {
-                    placesRoot
-                }
-            }
-            .navigationTitle("Places")
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
-                        .labelStyle(.iconOnly)
-                    Button("New Place", systemImage: "plus") {
-                        presentManagement(.createPlace)
+            browseChrome(
+                Group {
+                    if store.isLoading && store.activePlaces.isEmpty {
+                        ProgressView("Loading Places")
+                    } else if let selectedPlace {
+                        PlaceListView(
+                            store: store,
+                            place: selectedPlace,
+                            onSharePlace: onSharePlace,
+                            presentManagement: presentManagement
+                        )
+                    } else {
+                        emptyPlaces
                     }
-                    .labelStyle(.iconOnly)
                 }
-            }
+            )
             .navigationDestination(for: BrowseRoute.self) { route in
-                BrowseDestinationView(
-                    store: store,
-                    route: route,
-                    onSharePlace: onSharePlace,
-                    presentManagement: presentManagement
+                browseChrome(
+                    BrowseDestinationView(
+                        store: store,
+                        route: route,
+                        onSharePlace: onSharePlace,
+                        presentManagement: presentManagement
+                    )
                 )
             }
         }
         .sheet(item: $managementPresentation) { presentation in
-            ManagementSheet(store: store, route: presentation.route)
+            ManagementSheet(
+                store: store,
+                route: presentation.route,
+                onCreatedPlace: selectCreatedPlace
+            )
         }
         .onAppear(perform: restoreIfReady)
         .onChange(of: store.hasLoaded) { _, _ in restoreIfReady() }
         .onChange(of: store.places) { _, _ in reconcilePathAfterReload() }
-        .onChange(of: path) { _, newPath in persistDeepestDestination(in: newPath) }
+        .onChange(of: path) { _, _ in persistCurrentDestination() }
+    }
+
+    private func browseChrome<Content: View>(_ content: Content) -> some View {
+        ZStack {
+            content
+                .accessibilityHidden(isSearchPresented)
+                .allowsHitTesting(!isSearchPresented)
+            if isSearchPresented {
+                ThingSearchResultsContent(
+                    store: store,
+                    query: query,
+                    onSelect: navigateToSearchResult
+                )
+                .background(Color(uiColor: .systemGroupedBackground))
+                .accessibilityIdentifier("browse.searchResults")
+            }
+        }
+            .searchable(
+                text: $query,
+                isPresented: $isSearchPresented,
+                prompt: "Search"
+            )
+            .toolbar {
+                browseToolbar
+            }
+    }
+
+    @ToolbarContentBuilder
+    private var browseToolbar: some ToolbarContent {
+        if horizontalSizeClass == .compact {
+            ToolbarItem(placement: .bottomBar) {
+                placesMenu
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            ToolbarSpacer(.fixed, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                scanButton
+            }
+        } else {
+            ToolbarItem(placement: .bottomBar) {
+                placesMenu
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                scanButton
+            }
+        }
     }
 
     @ViewBuilder
-    private var placesRoot: some View {
-        if store.activePlaces.isEmpty {
-            ContentUnavailableView {
-                Label("No Places", systemImage: "house")
-            } description: {
-                Text("Create a Place to start cataloguing your things.")
-            } actions: {
+    private var placesMenu: some View {
+        Menu {
+            if !store.activePlaces.isEmpty {
+                Section("Places") {
+                    ForEach(store.activePlaces) { place in
+                        Button {
+                            selectPlace(place.id)
+                        } label: {
+                            if place.id == selectedPlaceID {
+                                Label(place.name, systemImage: "checkmark")
+                            } else {
+                                Text(place.name)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section {
                 Button("New Place", systemImage: "plus") {
                     presentManagement(.createPlace)
                 }
+                Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
             }
-        } else {
-            List(store.activePlaces) { place in
-                NavigationLink(value: BrowseRoute.place(place.id)) {
-                    Label(place.name, systemImage: "house")
-                }
-            }
-            .refreshable { await store.reload() }
-            .accessibilityIdentifier("browse.placesList")
+        } label: {
+            Image(systemName: "mappin.and.ellipse")
         }
+        .accessibilityLabel("Places")
+    }
+
+    private var scanButton: some View {
+        Button("Scan QR", systemImage: "qrcode.viewfinder", action: onScan)
+            .labelStyle(.iconOnly)
+    }
+
+    private var emptyPlaces: some View {
+        ContentUnavailableView {
+            Label("No Places", systemImage: "house")
+        } description: {
+            Text("Create a Place to start cataloguing your things.")
+        } actions: {
+            Button("New Place", systemImage: "plus") {
+                presentManagement(.createPlace)
+            }
+        }
+        .task {
+            guard
+                store.hasLoaded,
+                store.activePlaces.isEmpty,
+                !hasPresentedEmptyPlaceCreation
+            else { return }
+            hasPresentedEmptyPlaceCreation = true
+            presentManagement(.createPlace)
+        }
+    }
+
+    private var selectedPlace: PlaceSnapshot? {
+        guard let selectedPlaceID else { return nil }
+        return store.activePlaces.first { $0.id == selectedPlaceID }
     }
 
     private func presentManagement(_ route: ManagementRoute) {
@@ -210,35 +340,64 @@ struct BrowseView: View {
             destination = nil
         }
 
-        let restoredPath = BrowsePathRestorer.path(to: destination, in: store.activePlaces)
-        setPathWithoutAnimation(restoredPath ?? [])
-        if restoredPath == nil {
-            savedDestination = Data()
-        }
+        apply(
+            BrowseSelectionRestorer.state(
+                for: destination,
+                preferredPlaceID: UUID(uuidString: savedSelectedPlaceID),
+                in: store.activePlaces
+            )
+        )
         hasCompletedRestoration = true
+        persistCurrentDestination()
     }
 
     private func reconcilePathAfterReload() {
-        guard store.hasLoaded, hasCompletedRestoration, let destination = path.last else { return }
-
-        guard let reconciledPath = BrowsePathRestorer.path(to: destination, in: store.activePlaces) else {
-            savedDestination = Data()
-            setPathWithoutAnimation([])
-            return
-        }
-        if reconciledPath != path {
-            setPathWithoutAnimation(reconciledPath)
-        }
+        guard store.hasLoaded, hasCompletedRestoration else { return }
+        let destination = path.last ?? selectedPlaceID.map(BrowseRoute.place)
+        apply(
+            BrowseSelectionRestorer.state(
+                for: destination,
+                preferredPlaceID: selectedPlaceID,
+                in: store.activePlaces
+            )
+        )
+        persistCurrentDestination()
     }
 
-    private func persistDeepestDestination(in path: [BrowseRoute]) {
+    private func persistCurrentDestination() {
         guard hasCompletedRestoration else { return }
-        guard let destination = path.last else {
+        savedSelectedPlaceID = selectedPlaceID?.uuidString ?? ""
+        guard let destination = path.last ?? selectedPlaceID.map(BrowseRoute.place) else {
             savedDestination = Data()
             return
         }
         if let encoded = try? JSONEncoder().encode(destination) {
             savedDestination = encoded
+        }
+    }
+
+    private func selectPlace(_ placeID: UUID) {
+        selectedPlaceID = placeID
+        setPathWithoutAnimation([])
+        persistCurrentDestination()
+    }
+
+    private func selectCreatedPlace(_ placeID: UUID) {
+        selectPlace(placeID)
+    }
+
+    private func navigateToSearchResult(_ thing: ThingSnapshot) {
+        let restored = BrowseSelectionRestorer.state(for: .thing(thing.id), in: store.activePlaces)
+        isSearchPresented = false
+        query = ""
+        apply(restored)
+        persistCurrentDestination()
+    }
+
+    private func apply(_ restored: BrowseRestoredState) {
+        selectedPlaceID = restored.selectedPlaceID
+        if restored.visiblePath != path {
+            setPathWithoutAnimation(restored.visiblePath)
         }
     }
 
@@ -334,17 +493,8 @@ private struct BrowseDestinationView: View {
 
     var body: some View {
         switch route {
-        case .place(let id):
-            if let place = store.activePlaces.first(where: { $0.id == id }) {
-                PlaceListView(
-                    store: store,
-                    place: place,
-                    onSharePlace: onSharePlace,
-                    presentManagement: presentManagement
-                )
-            } else {
-                unavailable("Place", systemImage: "house")
-            }
+        case .place:
+            unavailable("Place", systemImage: "house")
         case .room(let id):
             RoomDetailView(store: store, roomID: id, presentManagement: presentManagement)
         case .area(let id):
@@ -908,6 +1058,6 @@ private struct ThingThumbnail: View {
 #Preview("Browse") {
     let persistence = PersistenceController.inMemory()
     let store = CatalogStore(persistence: persistence)
-    BrowseView(store: store, onSharePlace: { _ in }, onPrintQRCodes: {})
+    BrowseView(store: store, onSharePlace: { _ in }, onPrintQRCodes: {}, onScan: {})
         .task { await store.bootstrap() }
 }

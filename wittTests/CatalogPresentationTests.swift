@@ -172,6 +172,85 @@ final class CatalogPresentationTests: XCTestCase {
         XCTAssertNil(BrowsePathRestorer.path(to: .place(UUID()), in: [place]))
     }
 
+    func testBrowseSelectionRestoresSelectedPlaceAtVisibleRoot() {
+        let first = makePlace(name: "Home")
+        let selected = makePlace(name: "Studio")
+
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(for: .place(selected.id), in: [first, selected]),
+            BrowseRestoredState(selectedPlaceID: selected.id, visiblePath: [])
+        )
+    }
+
+    func testBrowseSelectionRestoresDeepDestinationWithoutLeadingPlace() {
+        let fixture = nestedFixture()
+
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(
+                for: .container(fixture.innerID),
+                in: [fixture.place]
+            ),
+            BrowseRestoredState(
+                selectedPlaceID: fixture.place.id,
+                visiblePath: [
+                    .room(fixture.roomID),
+                    .area(fixture.areaID),
+                    .container(fixture.outerID),
+                    .container(fixture.innerID)
+                ]
+            )
+        )
+    }
+
+    func testBrowseSelectionFallsBackDeterministicallyToFirstActivePlace() {
+        let archived = makePlace(name: "Archived", archived: true)
+        let first = makePlace(name: "Home")
+        let second = makePlace(name: "Studio")
+
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(
+                for: .container(UUID()),
+                in: [archived, first, second]
+            ),
+            BrowseRestoredState(selectedPlaceID: first.id, visiblePath: [])
+        )
+    }
+
+    func testBrowseSelectionKeepsPreferredPlaceWhenDeepDestinationDisappears() {
+        let first = makePlace(name: "Home")
+        let selected = makePlace(name: "Studio")
+
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(
+                for: .container(UUID()),
+                preferredPlaceID: selected.id,
+                in: [first, selected]
+            ),
+            BrowseRestoredState(selectedPlaceID: selected.id, visiblePath: [])
+        )
+    }
+
+    func testBrowseSelectionIgnoresUnavailablePreferredPlace() {
+        let first = makePlace(name: "Home")
+        let archived = makePlace(name: "Studio", archived: true)
+
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(
+                for: .container(UUID()),
+                preferredPlaceID: archived.id,
+                in: [first, archived]
+            ),
+            BrowseRestoredState(selectedPlaceID: first.id, visiblePath: [])
+        )
+    }
+
+    func testBrowseSelectionHandlesEmptyCatalogue() {
+        XCTAssertEqual(
+            BrowseSelectionRestorer.state(for: .place(UUID()), in: []),
+            BrowseRestoredState(selectedPlaceID: nil, visiblePath: [])
+        )
+    }
+
     func testDestinationPathDoesNotMatchTheWrongPlace() {
         let first = makePlace(name: "Home")
         let secondID = UUID()
@@ -500,7 +579,8 @@ final class CatalogPresentationTests: XCTestCase {
         areas: [AreaSnapshot] = [],
         containers: [ContainerSnapshot] = [],
         things: [ThingSnapshot] = [],
-        id: UUID = UUID()
+        id: UUID = UUID(),
+        archived: Bool = false
     ) -> PlaceSnapshot {
         PlaceSnapshot(
             id: id,
@@ -508,7 +588,7 @@ final class CatalogPresentationTests: XCTestCase {
             notes: nil,
             createdAt: nil,
             updatedAt: nil,
-            archivedAt: nil,
+            archivedAt: archived ? Date() : nil,
             primaryPhoto: nil,
             rooms: rooms,
             areas: areas,

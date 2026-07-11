@@ -1,16 +1,11 @@
 import SwiftUI
 
-enum AppTab: Hashable {
-    case browse
-    case scan
-    case find
-}
-
 struct AppShellView: View {
     @ObservedObject var store: CatalogStore
     private let deepLinkRouter: QRDeepLinkRouter
-    @State private var selectedTab: AppTab = .browse
     @State private var presentedScan: ScanPresentation?
+    @State private var isPresentingScanner = false
+    @State private var pendingScannerOutcome: ScannerOutcome?
     @State private var pendingDemo: ScanDemo?
     @State private var sharingSheet: PlaceSharingSheet?
     @State private var isPrintingQRCodes = false
@@ -29,27 +24,19 @@ struct AppShellView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Browse", systemImage: "square.grid.2x2", value: AppTab.browse) {
-                BrowseView(
-                    store: store,
-                    onSharePlace: sharePlace,
-                    onPrintQRCodes: { isPrintingQRCodes = true }
-                )
-            }
-
-            Tab("Scan", systemImage: "qrcode.viewfinder", value: AppTab.scan) {
-                ScanView(
-                    isPaused: selectedTab != .scan || presentedScan != nil || isRoutingQRCode,
-                    onPayload: handleScannerPayload
-                )
-            }
-
-            Tab(value: AppTab.find, role: .search) {
-                FindView(store: store)
-            }
+        BrowseView(
+            store: store,
+            onSharePlace: sharePlace,
+            onPrintQRCodes: { isPrintingQRCodes = true },
+            onScan: { isPresentingScanner = true }
+        )
+        .fullScreenCover(isPresented: $isPresentingScanner, onDismiss: finishScannerDismissal) {
+            ScanView(
+                isPaused: pendingScannerOutcome != nil,
+                onClose: { isPresentingScanner = false },
+                onPayload: handleScannerPayload
+            )
         }
-        .tabViewStyle(.sidebarAdaptable)
         .sheet(item: $presentedScan) { presentation in
             NavigationStack {
                 switch presentation.flow {
@@ -166,20 +153,27 @@ struct AppShellView: View {
     }
 
     private func handleScannerPayload(_ payload: String) {
-        guard let url = URL(string: payload) else {
+        guard pendingScannerOutcome == nil else { return }
+        pendingScannerOutcome = ScannerOutcome(payload: payload)
+        isPresentingScanner = false
+    }
+
+    private func finishScannerDismissal() {
+        guard let outcome = pendingScannerOutcome else { return }
+        pendingScannerOutcome = nil
+        switch outcome {
+        case .url(let url):
+            handleDeepLink(url)
+        case .invalidURL:
             deepLinkAlert = DeepLinkAlert(
                 title: "Invalid QR Code",
                 message: "This QR code does not contain a valid URL."
             )
-            return
         }
-
-        handleDeepLink(url)
     }
 
     private func closeScanFlow() {
         presentedScan = nil
-        selectedTab = .browse
     }
 
     private func sharePlace(_ placeID: UUID) {
@@ -213,6 +207,19 @@ struct AppShellView: View {
             presentedScan = ScanPresentation(flow: .createAttach(token))
         }
         pendingDemo = nil
+    }
+}
+
+enum ScannerOutcome: Equatable {
+    case url(URL)
+    case invalidURL
+
+    init(payload: String) {
+        guard let url = URL(string: payload), url.scheme != nil else {
+            self = .invalidURL
+            return
+        }
+        self = .url(url)
     }
 }
 

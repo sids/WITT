@@ -83,6 +83,7 @@ struct PlaceManagementForm: View {
     @ObservedObject var store: CatalogStore
     let placeID: UUID?
     @Binding var isSaving: Bool
+    var onCreated: (PlaceSnapshot) -> Void = { _ in }
     let onFinished: () -> Void
     @State private var values = ManagementFormValues()
     @State private var photo: ManagementPhotoSelection = .unchanged
@@ -184,7 +185,10 @@ struct PlaceManagementForm: View {
                 ))
         }
         isSaving = false
-        if result != nil { onFinished() }
+        if let result {
+            if placeID == nil { onCreated(result) }
+            onFinished()
+        }
     }
 
     private func archive() async {

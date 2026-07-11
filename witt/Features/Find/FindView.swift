@@ -3,6 +3,28 @@ import SwiftUI
 struct FindView: View {
     @ObservedObject var store: CatalogStore
     @State private var query = ""
+    @State private var path: [UUID] = []
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ThingSearchResultsContent(store: store, query: query) { thing in
+                path.append(thing.id)
+            }
+            .navigationTitle("Find")
+            .searchable(text: $query, prompt: "Things, keywords, or places")
+            .refreshable { await store.reload() }
+            .accessibilityIdentifier("find.searchResults")
+            .navigationDestination(for: UUID.self) { thingID in
+                ThingDetailView(store: store, thingID: thingID)
+            }
+        }
+    }
+}
+
+struct ThingSearchResultsContent: View {
+    @ObservedObject var store: CatalogStore
+    let query: String
+    let onSelect: (ThingSnapshot) -> Void
 
     private var results: [ThingSnapshot] {
         guard !query.isEmpty else { return store.things }
@@ -16,33 +38,29 @@ struct FindView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List(results) { thing in
-                NavigationLink(value: thing) {
-                    ThingRow(store: store, thing: thing)
-                }
+        List(results) { thing in
+            Button {
+                onSelect(thing)
+            } label: {
+                ThingRow(store: store, thing: thing)
             }
-            .overlay {
-                if results.isEmpty {
-                    if query.isEmpty {
-                        ContentUnavailableView(
-                            "No Things Yet",
-                            systemImage: "shippingbox",
-                            description: Text("Scan a Storage Area or Container to add one.")
-                        )
-                    } else {
-                        ContentUnavailableView.search(text: query)
-                    }
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows Thing details")
+        }
+        .overlay {
+            if results.isEmpty {
+                if query.isEmpty {
+                    ContentUnavailableView(
+                        "No Things Yet",
+                        systemImage: "shippingbox",
+                        description: Text("Scan a Storage Area or Container to add one.")
+                    )
+                } else {
+                    ContentUnavailableView.search(text: query)
                 }
-            }
-            .navigationTitle("Find")
-            .searchable(text: $query, prompt: "Things, keywords, or places")
-            .refreshable { await store.reload() }
-            .accessibilityIdentifier("find.searchResults")
-            .navigationDestination(for: ThingSnapshot.self) { thing in
-                ThingDetailView(store: store, thingID: thing.id)
             }
         }
+        .refreshable { await store.reload() }
     }
 }
 

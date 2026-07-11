@@ -13,6 +13,7 @@ enum ScanDemo: String, Identifiable {
 
 struct ScanView: View {
     let isPaused: Bool
+    let onClose: @MainActor @Sendable () -> Void
     let onPayload: @MainActor @Sendable (String) -> Void
 
     var body: some View {
@@ -20,6 +21,14 @@ struct ScanView: View {
             QRScannerView(isPaused: isPaused, onPayload: onPayload)
                 .navigationTitle("Scan QR")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(action: onClose) {
+                            Label("Close", systemImage: "xmark")
+                        }
+                        .labelStyle(.iconOnly)
+                    }
+                }
         }
     }
 }

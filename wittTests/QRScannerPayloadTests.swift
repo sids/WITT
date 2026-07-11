@@ -2,6 +2,16 @@ import XCTest
 @testable import witt
 
 final class QRScannerPayloadTests: XCTestCase {
+    func testScannerOutcomeAcceptsAbsoluteURLForDeferredRouting() {
+        let url = URL(string: "witt://qr/v1/BBBBBBBBBBBBBBBBBBBBBA")!
+
+        XCTAssertEqual(ScannerOutcome(payload: url.absoluteString), .url(url))
+    }
+
+    func testScannerOutcomeRejectsPayloadWithoutURLScheme() {
+        XCTAssertEqual(ScannerOutcome(payload: "not a URL"), .invalidURL)
+    }
+
     func testDeduplicatorSuppressesSamePayloadInsideWindow() {
         var deduplicator = QRScannerPayloadDeduplicator(suppressionInterval: 2)
         let start = Date(timeIntervalSinceReferenceDate: 1_000)

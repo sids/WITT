@@ -41,7 +41,7 @@ Place
 
 ## QR-First Cataloguing
 
-The Scan tab is a first-class entry point for repeated cataloguing while moving around a home. WITT scans real QR codes and also handles `witt://` links opened outside the scanner.
+The trailing Scan QR control is a first-class entry point for repeated cataloguing while moving around a home. WITT scans real QR codes and also handles `witt://` links opened outside the scanner.
 
 ### Known QR
 
@@ -55,11 +55,11 @@ When no suitable target exists, or the user chooses Create & Attach, one screen 
 
 ## Browse And Creation
 
-Browse opens by default on a Places screen. It lists every active Place as a navigation choice and provides New Place and Print QR Labels actions. Choosing a Place pushes its Rooms screen, whose title is the Place name. A standard ellipsis menu beside the title contains Rename Place and Share Place. When the Place already has an active iCloud share, a separate Shared button appears immediately before the ellipsis and opens the system sharing details and participant actions. There is no current-Place picker or hidden switching interaction.
+Browse opens by default on the selected Place's Rooms screen; there is no Places screen. Its title is the Place name. A standard ellipsis menu beside the title contains Rename Place and Share Place. When the Place already has an active iCloud share, a separate Shared button appears immediately before the ellipsis and opens the system sharing details and participant actions.
 
-Browse follows the same explicit hierarchy on iPhone and iPad: Places, Place, Room, Storage Area or Container, then Thing. The presentation may use available iPad space where it does not obscure this hierarchy, but Places remain the navigation root. Empty states provide the next useful creation action.
+The system bottom toolbar follows the compact Mail pattern: a leading menu for switching or creating Places, system search in the center, and a trailing Scan QR button. The Place menu clearly marks the current Place and also retains access to Print QR Labels. Switching Places returns to that Place's Rooms screen. With no active Place, New Place is the primary path forward.
 
-WITT remembers the deepest Browse destination across launches and restores it after the catalog loads, rebuilding the current hierarchy when that destination has moved. Returning to Places is an intentional restorable state; a missing or archived saved destination falls back safely to Places.
+Browse follows the same hierarchy on iPhone and iPad: selected Place, Room, Storage Area or Container, then Thing. WITT remembers both the selected Place and deepest in-Place destination across launches, restoring the current hierarchy when content has moved. A missing or archived destination returns to the selected Place's Rooms screen; an unavailable selected Place falls back safely to another active Place.
 
 Creation is contextual:
 
@@ -83,7 +83,9 @@ Counts include active Things nested anywhere beneath the displayed Room, Storage
 
 ## Find Loop
 
-Find is a dedicated search tab. Before a query, it lists all active Things. Search matches Thing names, keywords, and every component of the location path. A result shows the Thing and its location; opening it shows the photo, full location, keywords, and notes, with an edit action. The core loop is simple: search for what you remember, recognize the Thing, read where it is, and navigate the physical hierarchy if more context is needed.
+Find is the system search control in the center of the bottom toolbar, not a separate tab. Activating it searches all active Things across every Place by Thing name, keywords, and every component of the location path. A result shows the Thing and its location; opening it navigates through the result's current Place hierarchy to its detail, switching the selected Place when necessary. Canceling search without choosing a result leaves the Browse position unchanged. The core loop is simple: search for what you remember, recognize the Thing, and read where it is.
+
+The trailing Scan QR button presents the live camera full-screen over Browse. A standard close button dismisses it and returns to the exact prior Browse position. A recognized code continues directly into the known- or unknown-QR flow after the camera closes.
 
 ## Printable QR Labels
 
@@ -100,11 +102,11 @@ A Place is the complete collaboration boundary. Its Rooms, Storage Areas, Contai
 
 ## Native Experience
 
-WITT should feel fast, calm, and practical during physical cataloguing sessions. Use standard SwiftUI navigation, tabs, split views, lists, forms, search, sheets, toolbars, camera surfaces, and system controls. Let iOS 26 provide its native appearance, including Liquid Glass where the system applies it.
+WITT should feel fast, calm, and practical during physical cataloguing sessions. Use standard SwiftUI navigation, lists, forms, search, sheets, toolbars, camera surfaces, and system controls. Let iOS 26 provide its native appearance, including Liquid Glass where the system applies it.
 
 Do not add custom glass backgrounds, blur materials, translucent capsules, decorative borders, or custom glass button treatments by default. Keep the content layer clear and readable; express hierarchy through layout, grouping, typography, imagery, and restrained system tint. Avoid heavy onboarding and marketing surfaces. WITT opens on Browse, with Scan kept one tap away.
 
-The iPhone experience prioritizes quick, linear movement through capture and detail. The iPad experience uses available space while preserving the same visible Places-rooted hierarchy, catalogue model, and actions.
+The iPhone experience prioritizes quick, linear movement through capture and detail. The iPad experience uses available space while preserving the same selected-Place hierarchy, catalogue model, and actions.
 
 ## MVP Non-Goals
 

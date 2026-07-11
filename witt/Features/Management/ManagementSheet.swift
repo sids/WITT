@@ -3,19 +3,29 @@ import SwiftUI
 struct ManagementSheet: View {
     @ObservedObject private var store: CatalogStore
     private let route: ManagementRoute
+    private let onCreatedPlace: (UUID) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var isCommitting = false
 
-    init(store: CatalogStore, route: ManagementRoute) {
+    init(
+        store: CatalogStore,
+        route: ManagementRoute,
+        onCreatedPlace: @escaping (UUID) -> Void = { _ in }
+    ) {
         self.store = store
         self.route = route
+        self.onCreatedPlace = onCreatedPlace
     }
 
     var body: some View {
         NavigationStack {
-            ManagementForm(store: store, route: route, isCommitting: $isCommitting) {
-                dismiss()
-            }
+            ManagementForm(
+                store: store,
+                route: route,
+                isCommitting: $isCommitting,
+                onCreatedPlace: { onCreatedPlace($0.id) },
+                onFinished: { dismiss() }
+            )
         }
         .interactiveDismissDisabled(isCommitting)
     }
@@ -25,13 +35,15 @@ private struct ManagementForm: View {
     @ObservedObject var store: CatalogStore
     let route: ManagementRoute
     @Binding var isCommitting: Bool
+    let onCreatedPlace: (PlaceSnapshot) -> Void
     let onFinished: () -> Void
 
     @ViewBuilder var body: some View {
         switch route {
         case .createPlace:
             PlaceManagementForm(
-                store: store, placeID: nil, isSaving: $isCommitting, onFinished: onFinished)
+                store: store, placeID: nil, isSaving: $isCommitting,
+                onCreated: onCreatedPlace, onFinished: onFinished)
         case .createRoom(let placeID):
             RoomManagementForm(
                 store: store, roomID: nil, contextPlaceID: placeID, isSaving: $isCommitting,
