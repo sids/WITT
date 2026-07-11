@@ -40,7 +40,7 @@ struct FindView: View {
             .refreshable { await store.reload() }
             .accessibilityIdentifier("find.searchResults")
             .navigationDestination(for: ThingSnapshot.self) { thing in
-                ThingDetailView(store: store, thing: thing)
+                ThingDetailView(store: store, thingID: thing.id)
             }
         }
     }
