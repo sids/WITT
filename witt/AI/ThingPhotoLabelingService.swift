@@ -45,14 +45,58 @@ public struct ThingLabelSuggestion: Hashable, Sendable {
     }
 }
 
-public enum ThingPhotoLabelingError: Error, Equatable, Sendable {
+public enum ThingPhotoLabelingError: Error, Equatable, LocalizedError, Sendable {
     case invalidPhoto
     case unsupportedContentType
     case photoTooLarge
     case serviceUnavailable
+    case connectionUnavailable
+    case unauthorized
+    case forbidden
     case rateLimited
     case timedOut
+    case serverError
+    case unexpectedStatusCode(Int)
+    case incompleteResponse
+    case refused
+    case missingOutput
+    case malformedResponse
+    case malformedStructuredOutput
+    case emptyName
+    case invalidConfidence
     case invalidResponse
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPhoto:
+            return "This photo could not be read."
+        case .unsupportedContentType:
+            return "Only JPEG photos can be labeled."
+        case .photoTooLarge:
+            return "This photo is too large to label."
+        case .serviceUnavailable:
+            return "Photo labeling is not available right now."
+        case .connectionUnavailable:
+            return "Could not connect to photo labeling."
+        case .unauthorized, .forbidden:
+            return "Photo labeling is not configured correctly."
+        case .rateLimited:
+            return "Photo labeling is busy. Please try again shortly."
+        case .timedOut:
+            return "Photo labeling took too long. Please try again."
+        case .serverError:
+            return "Photo labeling is temporarily unavailable."
+        case .unexpectedStatusCode:
+            return "Photo labeling returned an unexpected result."
+        case .incompleteResponse:
+            return "Photo labeling did not finish. Please try again."
+        case .refused:
+            return "This photo could not be labeled."
+        case .missingOutput, .malformedResponse, .malformedStructuredOutput,
+             .emptyName, .invalidConfidence, .invalidResponse:
+            return "Photo labeling returned an invalid result."
+        }
+    }
 }
 
 public enum ThingKeywordNormalizer {

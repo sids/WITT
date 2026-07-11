@@ -20,9 +20,14 @@ struct WITTApp: App {
 struct ContentView: View {
     @StateObject private var store: CatalogStore
     private let persistence: PersistenceController
+    private let labelingService: any ThingPhotoLabelingService
 
-    init(persistence: PersistenceController = .shared) {
+    init(
+        persistence: PersistenceController = .shared,
+        labelingService: any ThingPhotoLabelingService = ThingPhotoLabelingServices.appDefault()
+    ) {
         self.persistence = persistence
+        self.labelingService = labelingService
         _store = StateObject(wrappedValue: CatalogStore(persistence: persistence))
     }
 
@@ -32,6 +37,7 @@ struct ContentView: View {
             initialScan: initialScan,
             qrResolver: store.repository
         )
+        .environment(\.thingPhotoLabelingService, labelingService)
         .task {
             await store.bootstrap()
         }

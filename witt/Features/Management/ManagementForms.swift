@@ -600,6 +600,7 @@ struct ThingManagementForm: View {
     let contextDestination: ThingDestination?
     @Binding var isSaving: Bool
     let onFinished: () -> Void
+    @Environment(\.thingPhotoLabelingService) private var labelingService
     @State private var values = ManagementFormValues()
     @State private var destination: ThingDestination?
     @State private var photo: ManagementPhotoSelection = .unchanged
@@ -722,8 +723,7 @@ struct ThingManagementForm: View {
 
     @MainActor private func analyze(_ selected: NormalizedPhoto, requestID: UUID) async {
         do {
-            let suggestion = try await MockThingPhotoLabelingService.demo.suggestLabel(
-                for: selected.photoInput)
+            let suggestion = try await labelingService.suggestLabel(for: selected.photoInput)
             guard analysisRequestID == requestID else { return }
             let application = ManagementAISuggestionApplication.apply(suggestion, to: values)
             values = application.values

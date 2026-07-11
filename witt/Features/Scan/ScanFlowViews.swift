@@ -27,7 +27,6 @@ struct ScanView: View {
 struct CaptureThingView: View {
     @ObservedObject var store: CatalogStore
     let destination: ThingDestination
-    let labelingService: any ThingPhotoLabelingService
     let onSaved: () -> Void
 
     @State private var photo: NormalizedPhoto?
@@ -36,18 +35,6 @@ struct CaptureThingView: View {
     @State private var hasOfferedCamera = false
     @State private var photoError: String?
     @Environment(\.dismiss) private var dismiss
-
-    init(
-        store: CatalogStore,
-        destination: ThingDestination,
-        labelingService: any ThingPhotoLabelingService = MockThingPhotoLabelingService.demo,
-        onSaved: @escaping () -> Void
-    ) {
-        self.store = store
-        self.destination = destination
-        self.labelingService = labelingService
-        self.onSaved = onSaved
-    }
 
     private var location: String {
         store.locationComponents(for: destination).joined(separator: " · ")
@@ -127,7 +114,6 @@ struct CaptureThingView: View {
                 store: store,
                 destination: destination,
                 photo: photo,
-                labelingService: labelingService,
                 onSaved: onSaved
             )
         }
@@ -144,8 +130,8 @@ struct ReviewThingView: View {
     @ObservedObject var store: CatalogStore
     let destination: ThingDestination
     let photo: NormalizedPhoto?
-    let labelingService: any ThingPhotoLabelingService
     let onSaved: () -> Void
+    @Environment(\.thingPhotoLabelingService) private var labelingService
 
     @State private var name = ""
     @State private var keywords = ""
@@ -227,11 +213,15 @@ struct ReviewThingView: View {
         analysisError = nil
         do {
             let suggestion = try await labelingService.suggestLabel(for: photo.photoInput)
+            guard !Task.isCancelled else { return }
             name = suggestion.proposedName
             keywords = suggestion.keywords.joined(separator: ", ")
             notes = suggestion.detail ?? ""
             usedAISuggestion = true
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             analysisError = "AI labeling is unavailable. You can enter the details manually."
         }
         isAnalyzing = false

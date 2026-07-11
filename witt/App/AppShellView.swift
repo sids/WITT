@@ -70,7 +70,6 @@ struct AppShellView: View {
                         store: store,
                         destination: destination,
                         photo: photo,
-                        labelingService: MockThingPhotoLabelingService.demo,
                         onSaved: closeScanFlow
                     )
                 case .createAttach(let token):
