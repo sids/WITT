@@ -32,6 +32,7 @@ Place
 - Photos are supported for Places, Storage Areas, Containers, and Things. Thing capture accepts the camera or photo library.
 - QR codes use `witt://` links and attach only to Storage Areas and Containers. Rooms and Things do not receive QR codes in the MVP.
 - The current attach flow offers targets without an active QR. Whether WITT should support multiple active QR codes per target remains a product decision in [todo.md](todo.md).
+- New Storage Areas and Containers may scan and bind an unused WITT QR code before saving. Existing targets expose Attach QR Code or Reattach QR Code from their navigation action menu. Reattaching replaces that target's current binding and makes its former label unassigned again; WITT must reject, rather than silently move, a scanned code already attached elsewhere.
 - Things always have one current location and can be moved within the same Place.
 - Containers may be nested. Archiving a parent archives its contained catalogue branch after confirmation.
 - Sharing is rooted at the Place and grants invited participants complete read/write collaboration for that Place.
@@ -54,9 +55,9 @@ When no suitable target exists, or the user chooses Create & Attach, one screen 
 
 ## Browse And Creation
 
-Browse opens by default and shows one current Place. The Place header supports switching Places, creating a Place, and explicit edit and share actions. The QR-label action and familiar pencil edit actions remain visible toolbar controls.
+Browse opens by default on a Places screen. It lists every active Place as a navigation choice and provides New Place and Print QR Labels actions. Choosing a Place pushes its Rooms screen, whose title is the Place name. A standard ellipsis menu beside the title contains Rename Place and Share Place. When the Place already has an active iCloud share, a separate Shared button appears immediately before the ellipsis and opens the system sharing details and participant actions. There is no current-Place picker or hidden switching interaction.
 
-On iPhone, Browse navigates from the current Place through Rooms, Storage Areas, Containers, and Things. On iPad, it uses a split view with Rooms in the sidebar and the selected Room in the detail area. Empty states provide the next useful creation action.
+Browse follows the same explicit hierarchy on iPhone and iPad: Places, Place, Room, Storage Area or Container, then Thing. The presentation may use available iPad space where it does not obscure this hierarchy, but Places remain the navigation root. Empty states provide the next useful creation action.
 
 Creation is contextual:
 
@@ -64,7 +65,10 @@ Creation is contextual:
 - A Room offers New Storage Area and displays Things and Containers located directly in the Room.
 - A Storage Area offers New Container or New Thing.
 - A Container offers New Container or New Thing, including nested Containers.
+- New Storage Area and Container forms can optionally scan an unused QR label. Their detail screens keep QR assignment in the ellipsis menu rather than showing QR status in the content layer.
 - Management forms support create, edit, same-Place move, photo replacement or removal, and archive with impact confirmation.
+
+Storage Area details appear as secondary, noninteractive text immediately beneath the screen title rather than inside a grouped row that resembles a button.
 
 ## Find Loop
 
@@ -89,7 +93,7 @@ WITT should feel fast, calm, and practical during physical cataloguing sessions.
 
 Do not add custom glass backgrounds, blur materials, translucent capsules, decorative borders, or custom glass button treatments by default. Keep the content layer clear and readable; express hierarchy through layout, grouping, typography, imagery, and restrained system tint. Avoid heavy onboarding and marketing surfaces. WITT opens on Browse, with Scan kept one tap away.
 
-The iPhone experience prioritizes quick, linear movement through capture and detail. The iPad experience uses available space for sidebar-based browsing while preserving the same catalogue model and actions.
+The iPhone experience prioritizes quick, linear movement through capture and detail. The iPad experience uses available space while preserving the same visible Places-rooted hierarchy, catalogue model, and actions.
 
 ## MVP Non-Goals
 

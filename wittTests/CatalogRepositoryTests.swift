@@ -78,6 +78,173 @@ final class CatalogRepositoryTests: XCTestCase {
         XCTAssertFalse(remainingTargets.contains { $0.id == area.id })
     }
 
+    func testCreateAreaWithQRCodeIsAtomicAndPreservesDraftFields() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let room = try XCTUnwrap(place.rooms.first)
+        let token = try QRToken.generate()
+        let photo = Self.photo(bytes: [0x11, 0x22, 0x33])
+
+        let area = try await repository.createArea(.init(
+            roomID: room.id,
+            name: " Seasonal Shelf ",
+            detail: " Above the coats ",
+            photo: photo,
+            qrToken: token
+        ))
+
+        XCTAssertEqual(area.name, "Seasonal Shelf")
+        XCTAssertEqual(area.detail, "Above the coats")
+        XCTAssertEqual(area.primaryPhoto?.data, photo.jpegData)
+        XCTAssertTrue(area.hasQRCode)
+        let resolution = try await repository.resolve(token)
+        XCTAssertEqual(resolution, .knownArea(QRTargetID(rawValue: area.id)))
+
+        let context = persistence.newBackgroundContext(author: "witt.catalog.area-qr-tests")
+        try await context.perform {
+            let storedArea: Area = try Self.fetch(id: area.id, entity: "Area", in: context)
+            let qrCode = try XCTUnwrap((storedArea.qrCodes?.allObjects as? [QRCode])?.first)
+            XCTAssertEqual(qrCode.objectID.persistentStore, storedArea.objectID.persistentStore)
+            XCTAssertEqual(storedArea.primaryPhoto?.objectID.persistentStore, storedArea.objectID.persistentStore)
+        }
+    }
+
+    func testCreateContainerWithQRCodeIsAtomicAndPreservesDraftFields() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let token = try QRToken.generate()
+        let photo = Self.photo(bytes: [0x44, 0x55, 0x66])
+
+        let container = try await repository.createContainer(.init(
+            name: " Green Crate ",
+            detail: " Holiday lights ",
+            destination: .area(area.id),
+            photo: photo,
+            qrToken: token
+        ))
+
+        XCTAssertEqual(container.name, "Green Crate")
+        XCTAssertEqual(container.detail, "Holiday lights")
+        XCTAssertEqual(container.primaryPhoto?.data, photo.jpegData)
+        XCTAssertTrue(container.hasQRCode)
+        let resolution = try await repository.resolve(token)
+        XCTAssertEqual(resolution, .knownContainer(QRTargetID(rawValue: container.id)))
+
+        let context = persistence.newBackgroundContext(author: "witt.catalog.container-qr-tests")
+        try await context.perform {
+            let stored: Container = try Self.fetch(id: container.id, entity: "Container", in: context)
+            let qrCode = try XCTUnwrap((stored.qrCodes?.allObjects as? [QRCode])?.first)
+            XCTAssertEqual(qrCode.objectID.persistentStore, stored.objectID.persistentStore)
+            XCTAssertEqual(stored.primaryPhoto?.objectID.persistentStore, stored.objectID.persistentStore)
+        }
+    }
+
+    func testCreateTargetsRejectUsedQRCodeWithoutCreatingTargets() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let room = try XCTUnwrap(place.rooms.first)
+        let area = try XCTUnwrap(place.areas.first)
+        let existingTarget = try XCTUnwrap(place.areas.first { $0.id != area.id })
+        let token = try QRToken.generate()
+        let existingBindingTarget = QRBindingTarget.area(QRTargetID(rawValue: existingTarget.id))
+        _ = try await repository.bindQRCode(.init(token: token, target: existingBindingTarget))
+        let before = try await repository.fetchPlaces()
+
+        await assertRepositoryError(.tokenAlreadyBound) {
+            _ = try await repository.createArea(.init(
+                roomID: room.id, name: "Must Not Exist", qrToken: token
+            ))
+        }
+        await assertRepositoryError(.tokenAlreadyBound) {
+            _ = try await repository.createContainer(.init(
+                name: "Also Must Not Exist", destination: .area(area.id), qrToken: token
+            ))
+        }
+
+        let after = try await repository.fetchPlaces()
+        XCTAssertEqual(after, before)
+    }
+
+    func testReplaceQRCodesForAreaAndContainerReleasesOldTokens() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let container = try XCTUnwrap(place.containers.first)
+        let oldAreaToken = try QRToken.generate()
+        let newAreaToken = try QRToken.generate()
+        let oldContainerToken = try QRToken.generate()
+        let newContainerToken = try QRToken.generate()
+        let areaTarget = QRBindingTarget.area(QRTargetID(rawValue: area.id))
+        let containerTarget = QRBindingTarget.container(QRTargetID(rawValue: container.id))
+        _ = try await repository.bindQRCode(.init(token: oldAreaToken, target: areaTarget))
+        _ = try await repository.bindQRCode(.init(token: oldContainerToken, target: containerTarget))
+
+        _ = try await repository.replaceQRCode(.init(token: newAreaToken, target: areaTarget))
+        _ = try await repository.replaceQRCode(.init(token: newContainerToken, target: containerTarget))
+
+        let oldAreaResolution = try await repository.resolve(oldAreaToken)
+        let newAreaResolution = try await repository.resolve(newAreaToken)
+        let oldContainerResolution = try await repository.resolve(oldContainerToken)
+        let newContainerResolution = try await repository.resolve(newContainerToken)
+        XCTAssertEqual(oldAreaResolution, .unknown)
+        XCTAssertEqual(newAreaResolution, .knownArea(QRTargetID(rawValue: area.id)))
+        XCTAssertEqual(oldContainerResolution, .unknown)
+        XCTAssertEqual(newContainerResolution, .knownContainer(QRTargetID(rawValue: container.id)))
+    }
+
+    func testReplaceQRCodeRefusesTokenBoundElsewhereAndPreservesBothBindings() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let areas = place.areas.prefix(2)
+        let first = try XCTUnwrap(areas.first)
+        let second = try XCTUnwrap(areas.last)
+        let firstToken = try QRToken.generate()
+        let secondToken = try QRToken.generate()
+        let firstTarget = QRBindingTarget.area(QRTargetID(rawValue: first.id))
+        let secondTarget = QRBindingTarget.area(QRTargetID(rawValue: second.id))
+        _ = try await repository.bindQRCode(.init(token: firstToken, target: firstTarget))
+        _ = try await repository.bindQRCode(.init(token: secondToken, target: secondTarget))
+
+        await assertRepositoryError(.tokenAlreadyBound) {
+            _ = try await repository.replaceQRCode(.init(token: secondToken, target: firstTarget))
+        }
+
+        let firstResolution = try await repository.resolve(firstToken)
+        let secondResolution = try await repository.resolve(secondToken)
+        XCTAssertEqual(firstResolution, .knownArea(QRTargetID(rawValue: first.id)))
+        XCTAssertEqual(secondResolution, .knownArea(QRTargetID(rawValue: second.id)))
+    }
+
+    func testReplaceQRCodeWithSameTargetIsIdempotentAndRemovesOtherTargetRows() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let retainedToken = try QRToken.generate()
+        let obsoleteToken = try QRToken.generate()
+        let areaTarget = QRBindingTarget.area(QRTargetID(rawValue: area.id))
+        _ = try await repository.bindQRCode(.init(token: retainedToken, target: areaTarget))
+
+        let context = persistence.viewContext
+        try await context.perform {
+            let storedArea: Area = try Self.fetch(id: area.id, entity: "Area", in: context)
+            let obsolete: QRCode = Self.insert("QRCode", into: context)
+            obsolete.token = obsoleteToken.rawValue
+            obsolete.state = "bound"
+            obsolete.place = storedArea.place
+            obsolete.area = storedArea
+            try context.save()
+        }
+
+        let binding = try await repository.replaceQRCode(.init(
+            token: retainedToken, target: areaTarget
+        ))
+
+        XCTAssertEqual(binding, QRCodeBinding(token: retainedToken, target: areaTarget))
+        let retainedResolution = try await repository.resolve(retainedToken)
+        let obsoleteResolution = try await repository.resolve(obsoleteToken)
+        XCTAssertEqual(retainedResolution, .knownArea(QRTargetID(rawValue: area.id)))
+        XCTAssertEqual(obsoleteResolution, .unknown)
+        try await context.perform {
+            let storedArea: Area = try Self.fetch(id: area.id, entity: "Area", in: context)
+            XCTAssertEqual((storedArea.qrCodes?.allObjects as? [QRCode])?.count, 1)
+        }
+    }
+
     func testResolveReportsRepairAndConflictFromStoredRows() async throws {
         let (repository, persistence, place) = try await makeSampleRepository()
         let token = try XCTUnwrap(QRToken(rawValue: "BBBBBBBBBBBBBBBBBBBBBA"))

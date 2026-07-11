@@ -88,6 +88,7 @@ struct PlaceManagementForm: View {
     @State private var photo: ManagementPhotoSelection = .unchanged
     @State private var initialized = false
     @State private var confirmsArchive = false
+    @FocusState private var isNameFocused: Bool
 
     private var place: PlaceSnapshot? { placeID.flatMap(store.place(id:)) }
     private var isAvailable: Bool {
@@ -101,6 +102,7 @@ struct PlaceManagementForm: View {
                 Form {
                     Section("Place") {
                         TextField("Name", text: $values.name)
+                            .focused($isNameFocused)
                         TextField("Notes", text: $values.notes, axis: .vertical)
                     }
                     ManagementPhotoSection(
@@ -125,7 +127,12 @@ struct PlaceManagementForm: View {
                 isCommitting: $isSaving
             )
         }
-        .task { initialize() }
+        .task {
+            initialize()
+            guard placeID == nil else { return }
+            await Task.yield()
+            isNameFocused = true
+        }
         .confirmationDialog("Archive Place?", isPresented: $confirmsArchive, titleVisibility: .visible) {
             Button("Archive Place", role: .destructive) { beginArchive() }
         } message: {
@@ -207,6 +214,7 @@ struct RoomManagementForm: View {
     @State private var selectedPlaceID: UUID?
     @State private var initialized = false
     @State private var confirmsArchive = false
+    @FocusState private var isNameFocused: Bool
 
     private var room: RoomSnapshot? { roomID.flatMap(store.room(id:)) }
     private var place: PlaceSnapshot? { room.flatMap(store.place(containing:)) }
@@ -224,7 +232,10 @@ struct RoomManagementForm: View {
         Group {
             if isAvailable {
                 Form {
-                    Section("Room") { TextField("Name", text: $name) }
+                    Section("Room") {
+                        TextField("Name", text: $name)
+                            .focused($isNameFocused)
+                    }
                     Section("Place") {
                         if let place {
                             Label(place.name, systemImage: "house")
@@ -253,7 +264,12 @@ struct RoomManagementForm: View {
                 isCommitting: $isSaving
             )
         }
-        .task { initialize() }
+        .task {
+            initialize()
+            guard roomID == nil else { return }
+            await Task.yield()
+            isNameFocused = true
+        }
         .onChange(of: places.map(\.id)) { _, _ in reconcileSelectedPlace() }
         .confirmationDialog("Archive Room?", isPresented: $confirmsArchive, titleVisibility: .visible) {
             Button("Archive Room", role: .destructive) { beginArchive() }
@@ -325,6 +341,9 @@ struct AreaManagementForm: View {
     @State private var photo: ManagementPhotoSelection = .unchanged
     @State private var initialized = false
     @State private var confirmsArchive = false
+    @State private var selectedQRToken: QRToken?
+    @State private var showsQRScanner = false
+    @FocusState private var isNameFocused: Bool
 
     private var area: AreaSnapshot? { areaID.flatMap(store.area(id:)) }
     private var place: PlaceSnapshot? { area.flatMap(store.place(containing:)) }
@@ -346,6 +365,7 @@ struct AreaManagementForm: View {
                 Form {
                     Section("Storage Area") {
                         TextField("Name", text: $values.name)
+                            .focused($isNameFocused)
                         Picker("Room", selection: $selectedRoomID) {
                             ForEach(rooms) { room in
                                 Text(roomLabel(room)).tag(Optional(room.id))
@@ -358,6 +378,7 @@ struct AreaManagementForm: View {
                         selection: $photo,
                         onReplacement: { _ in }
                     )
+                    if areaID == nil { qrCodeSection }
                     if areaID != nil {
                         Section {
                             Button("Archive Storage Area", role: .destructive) { confirmsArchive = true }
@@ -379,8 +400,18 @@ struct AreaManagementForm: View {
                 isCommitting: $isSaving
             )
         }
-        .task { initialize() }
+        .task {
+            initialize()
+            guard areaID == nil else { return }
+            await Task.yield()
+            isNameFocused = true
+        }
         .onChange(of: rooms.map(\.id)) { _, _ in reconcileSelectedRoom() }
+        .fullScreenCover(isPresented: $showsQRScanner) {
+            QRAssignmentScanner(store: store, expectedTarget: nil) { token in
+                selectedQRToken = token
+            }
+        }
         .confirmationDialog(
             "Archive Storage Area?", isPresented: $confirmsArchive, titleVisibility: .visible
         ) {
@@ -395,6 +426,27 @@ struct AreaManagementForm: View {
 
     private func roomLabel(_ room: RoomSnapshot) -> String {
         areaID == nil ? "\(store.place(id: room.placeID)?.name ?? "Place") · \(room.name)" : room.name
+    }
+
+    private var qrCodeSection: some View {
+        Section("QR Code") {
+            if selectedQRToken == nil {
+                Button("Scan QR Code", systemImage: "qrcode.viewfinder") {
+                    presentQRScanner()
+                }
+            } else {
+                Label("QR Code Ready", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+                Button("Scan Different QR Code", systemImage: "qrcode.viewfinder") {
+                    presentQRScanner()
+                }
+            }
+        }
+    }
+
+    private func presentQRScanner() {
+        isNameFocused = false
+        showsQRScanner = true
     }
 
     private func initialize() {
@@ -426,7 +478,7 @@ struct AreaManagementForm: View {
             result = await store.createArea(
                 CreateAreaDraft(
                     roomID: selectedRoomID, name: values.normalizedName, detail: values.normalizedDetail,
-                    photo: photo.createPhoto))
+                    photo: photo.createPhoto, qrToken: selectedQRToken))
         }
         isSaving = false
         if result != nil { onFinished() }
@@ -460,6 +512,9 @@ struct ContainerManagementForm: View {
     @State private var photo: ManagementPhotoSelection = .unchanged
     @State private var initialized = false
     @State private var confirmsArchive = false
+    @State private var selectedQRToken: QRToken?
+    @State private var showsQRScanner = false
+    @FocusState private var isNameFocused: Bool
 
     private var container: ContainerSnapshot? { containerID.flatMap(store.container(id:)) }
     private var place: PlaceSnapshot? { container.flatMap(store.place(containing:)) }
@@ -479,6 +534,7 @@ struct ContainerManagementForm: View {
                 Form {
                     Section("Container") {
                         TextField("Name", text: $values.name)
+                            .focused($isNameFocused)
                         Picker("Parent", selection: $destination) {
                             ForEach(options) { option in
                                 Text(option.displayPath).tag(Optional(option.destination))
@@ -492,12 +548,8 @@ struct ContainerManagementForm: View {
                         selection: $photo,
                         onReplacement: { _ in }
                     )
-                    if let container {
-                        Section("QR Code") {
-                            Label(
-                                container.hasQRCode ? "Attached" : "Not attached",
-                                systemImage: container.hasQRCode ? "qrcode" : "qrcode.viewfinder")
-                        }
+                    if containerID == nil { qrCodeSection }
+                    if containerID != nil {
                         Section {
                             Button("Archive Container", role: .destructive) { confirmsArchive = true }
                                 .accessibilityIdentifier("management.archive")
@@ -518,8 +570,18 @@ struct ContainerManagementForm: View {
                 isCommitting: $isSaving
             )
         }
-        .task { initialize() }
+        .task {
+            initialize()
+            guard containerID == nil else { return }
+            await Task.yield()
+            isNameFocused = true
+        }
         .onChange(of: options.map(\.destination)) { _, _ in reconcileDestination() }
+        .fullScreenCover(isPresented: $showsQRScanner) {
+            QRAssignmentScanner(store: store, expectedTarget: nil) { token in
+                selectedQRToken = token
+            }
+        }
         .confirmationDialog(
             "Archive Container?", isPresented: $confirmsArchive, titleVisibility: .visible
         ) {
@@ -540,6 +602,27 @@ struct ContainerManagementForm: View {
         destination =
             container.map { destination(from: $0.parent) }
             ?? ManagementPreselection.containerDestination(context: contextDestination, options: options)
+    }
+
+    private var qrCodeSection: some View {
+        Section("QR Code") {
+            if selectedQRToken == nil {
+                Button("Scan QR Code", systemImage: "qrcode.viewfinder") {
+                    presentQRScanner()
+                }
+            } else {
+                Label("QR Code Ready", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+                Button("Scan Different QR Code", systemImage: "qrcode.viewfinder") {
+                    presentQRScanner()
+                }
+            }
+        }
+    }
+
+    private func presentQRScanner() {
+        isNameFocused = false
+        showsQRScanner = true
     }
 
     private func reconcileDestination() {
@@ -571,7 +654,7 @@ struct ContainerManagementForm: View {
             result = await store.createContainer(
                 CreateContainerDraft(
                     name: values.normalizedName, detail: values.normalizedDetail, destination: destination,
-                    photo: photo.createPhoto))
+                    photo: photo.createPhoto, qrToken: selectedQRToken))
         }
         isSaving = false
         if result != nil { onFinished() }
@@ -612,6 +695,7 @@ struct ThingManagementForm: View {
     @State private var aiAppliedKeywords: String?
     @State private var aiAppliedNotes: String?
     @State private var confirmsArchive = false
+    @FocusState private var isNameFocused: Bool
 
     private var thing: ThingSnapshot? { thingID.flatMap(store.thing(id:)) }
     private var place: PlaceSnapshot? { thing.flatMap(store.place(containing:)) }
@@ -639,6 +723,7 @@ struct ThingManagementForm: View {
                     }
                     Section("Thing") {
                         TextField("Name", text: $values.name)
+                            .focused($isNameFocused)
                         TextField("Keywords", text: $values.keywords, axis: .vertical)
                             .textInputAutocapitalization(.never)
                         TextField("Notes", text: $values.notes, axis: .vertical)
@@ -676,7 +761,12 @@ struct ThingManagementForm: View {
                 isCommitting: $isSaving
             )
         }
-        .task { initialize() }
+        .task {
+            initialize()
+            guard thingID == nil else { return }
+            await Task.yield()
+            isNameFocused = true
+        }
         .onChange(of: options.map(\.destination)) { _, _ in reconcileDestination() }
         .onDisappear { analysisRequestID = nil }
         .confirmationDialog("Archive Thing?", isPresented: $confirmsArchive, titleVisibility: .visible) {

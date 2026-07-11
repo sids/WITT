@@ -1,11 +1,14 @@
 # WITT Implementation Status
 
-WITT is at the sixth integrated implementation milestone. The native SwiftUI app supports iPhone and iPad on iOS 26 and uses Core Data with private and shared CloudKit stores.
+WITT is at the seventh integrated implementation milestone. The native SwiftUI app supports iPhone and iPad on iOS 26 and uses Core Data with private and shared CloudKit stores.
 
 ## Integrated Capabilities
 
 - Browse, Search, Thing detail, known-QR add-Thing, and unknown-QR attach/create flows use immutable snapshots from `CoreDataCatalogRepository`.
-- Browse opens by default with Place switching and creation, Place-local edit and share actions, contextual creation controls, useful empty states, and live detail navigation.
+- Browse opens on a Places-rooted navigation stack. The root lists Places and owns New Place and Print QR Labels; each Place pushes a Rooms screen with Rename and Share in an ellipsis menu plus a separate Shared management button when a CloudKit share exists.
+- Contextual creation controls continue through Rooms, Storage Areas, and Containers. Creation sheets focus their primary name field immediately, and empty list actions use standalone system rows.
+- New Storage Area and Container forms can scan and atomically bind an unused WITT QR label. Existing target screens expose Attach/Reattach through ellipsis menus and a shared full-screen scanner; replacement releases the old label but never takes a code attached elsewhere.
+- Storage Area details render as secondary text beneath the title, while QR status stays out of Storage Area and Container content screens.
 - AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, duplicate suppression, known destinations, and unknown tokens.
 - Camera and Photos picker input is normalized, stripped of metadata, resized, thumbnailed, and stored as explicit `PhotoAsset` records.
 - Place-rooted CloudKit sharing includes private/shared stores, read/write participant sharing UI, and invitation acceptance.
@@ -22,7 +25,7 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 ## Verification And Distribution
 
-The baseline is 102 passing `wittTests` simulator tests covering persistence, containment and management mutations, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
+The baseline is 108 passing `wittTests` simulator tests covering persistence, containment and management mutations, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers. Two obsolete current-Place selection tests were removed with the Places-root navigation model.
 
 Version 1.0 build 2 is available to the `WITT Internal` TestFlight group. See [release.md](release.md) for durable release facts and process.
 

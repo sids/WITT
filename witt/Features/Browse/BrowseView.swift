@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 private enum BrowseRoute: Hashable {
+    case place(UUID)
     case room(UUID)
     case area(UUID)
     case container(UUID)
@@ -13,81 +14,48 @@ private struct ManagementPresentation: Identifiable {
     let route: ManagementRoute
 }
 
-struct BrowseSelection: Equatable {
-    var placeID: UUID?
-    var roomID: UUID?
-
-    mutating func reconcile(with places: [PlaceSnapshot]) {
-        guard !places.isEmpty else {
-            placeID = nil
-            roomID = nil
-            return
-        }
-
-        let place = places.first(where: { $0.id == placeID }) ?? places[0]
-        placeID = place.id
-        if let roomID, place.activeRooms.contains(where: { $0.id == roomID }) { return }
-        roomID = place.activeRooms.first?.id
-    }
-
-    mutating func selectPlace(_ id: UUID, from places: [PlaceSnapshot]) {
-        placeID = id
-        roomID = nil
-        reconcile(with: places)
-    }
-}
-
 struct BrowseView: View {
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
     let onPrintQRCodes: () -> Void
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var managementPresentation: ManagementPresentation?
-    @State private var selection = BrowseSelection()
-    @State private var placeIDsBeforeCreation: Set<UUID>?
 
     var body: some View {
-        Group {
-            if store.isLoading && store.activePlaces.isEmpty {
-                ProgressView("Loading Places")
-            } else if horizontalSizeClass == .regular {
-                BrowseSplitView(
-                    store: store,
-                    selection: $selection,
-                    onSharePlace: onSharePlace,
-                    onPrintQRCodes: onPrintQRCodes,
-                    presentManagement: presentManagement
-                )
-            } else {
-                NavigationStack {
-                    browseRoot
-                        .navigationDestination(for: BrowseRoute.self) { route in
-                            BrowseDestinationView(
-                                store: store, route: route, presentManagement: presentManagement)
-                        }
+        NavigationStack {
+            Group {
+                if store.isLoading && store.activePlaces.isEmpty {
+                    ProgressView("Loading Places")
+                } else {
+                    placesRoot
                 }
             }
-        }
-        .sheet(item: $managementPresentation, onDismiss: {
-            placeIDsBeforeCreation = nil
-        }) { presentation in
-            ManagementSheet(store: store, route: presentation.route)
-        }
-        .onAppear { selection.reconcile(with: store.activePlaces) }
-        .onChange(of: store.places) { _, _ in
-            if let previousIDs = placeIDsBeforeCreation,
-                let created = store.activePlaces.first(where: { !previousIDs.contains($0.id) })
-            {
-                selection.selectPlace(created.id, from: store.activePlaces)
-                placeIDsBeforeCreation = nil
-            } else {
-                selection.reconcile(with: store.activePlaces)
+            .navigationTitle("Places")
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
+                        .labelStyle(.iconOnly)
+                    Button("New Place", systemImage: "plus") {
+                        presentManagement(.createPlace)
+                    }
+                    .labelStyle(.iconOnly)
+                }
             }
+            .navigationDestination(for: BrowseRoute.self) { route in
+                BrowseDestinationView(
+                    store: store,
+                    route: route,
+                    onSharePlace: onSharePlace,
+                    presentManagement: presentManagement
+                )
+            }
+        }
+        .sheet(item: $managementPresentation) { presentation in
+            ManagementSheet(store: store, route: presentation.route)
         }
     }
 
     @ViewBuilder
-    private var browseRoot: some View {
+    private var placesRoot: some View {
         if store.activePlaces.isEmpty {
             ContentUnavailableView {
                 Label("No Places", systemImage: "house")
@@ -98,133 +66,32 @@ struct BrowseView: View {
                     presentManagement(.createPlace)
                 }
             }
-            .navigationTitle("Browse")
-        } else if let place = currentPlace {
-            PlaceListView(
-                store: store,
-                place: place,
-                allPlaces: store.activePlaces,
-                selection: $selection,
-                onSharePlace: onSharePlace,
-                onPrintQRCodes: onPrintQRCodes,
-                presentManagement: presentManagement
-            )
-            .navigationTitle("Browse")
-        }
-    }
-
-    private var currentPlace: PlaceSnapshot? {
-        store.activePlaces.first(where: { $0.id == selection.placeID }) ?? store.activePlaces.first
-    }
-
-    private func presentManagement(_ route: ManagementRoute) {
-        if route == .createPlace {
-            placeIDsBeforeCreation = Set(store.activePlaces.map(\.id))
-        }
-        managementPresentation = ManagementPresentation(route: route)
-    }
-}
-
-private struct BrowseSplitView: View {
-    @ObservedObject var store: CatalogStore
-    @Binding var selection: BrowseSelection
-    let onSharePlace: (UUID) -> Void
-    let onPrintQRCodes: () -> Void
-    let presentManagement: (ManagementRoute) -> Void
-
-    var body: some View {
-        NavigationSplitView {
-            List(selection: $selection.roomID) {
-                if let place = currentPlace {
-                    PlaceHeader(
-                        place: place,
-                        allPlaces: store.activePlaces,
-                        selection: $selection,
-                        onSharePlace: onSharePlace,
-                        presentManagement: presentManagement
-                    )
-                    Section("Rooms") {
-                        ForEach(place.activeRooms) { room in
-                            Button {
-                                selection.roomID = room.id
-                            } label: {
-                                Label(room.name, systemImage: "door.left.hand.open")
-                            }
-                            .buttonStyle(.plain)
-                            .tag(room.id)
-                        }
-                        Button("New Room", systemImage: "plus") {
-                            presentManagement(.createRoom(placeID: place.id))
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Browse")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
-                        .labelStyle(.iconOnly)
+        } else {
+            List(store.activePlaces) { place in
+                NavigationLink(value: BrowseRoute.place(place.id)) {
+                    Label(place.name, systemImage: "house")
                 }
             }
             .refreshable { await store.reload() }
-        } detail: {
-            NavigationStack {
-                if let roomID = selection.roomID {
-                    RoomDetailView(store: store, roomID: roomID, presentManagement: presentManagement)
-                        .navigationDestination(for: BrowseRoute.self) { route in
-                            BrowseDestinationView(
-                                store: store, route: route, presentManagement: presentManagement)
-                        }
-                } else if let place = currentPlace {
-                    ContentUnavailableView {
-                        Label("No Rooms", systemImage: "door.left.hand.open")
-                    } description: {
-                        Text("Add the first Room in \(place.name).")
-                    } actions: {
-                        Button("New Room", systemImage: "plus") {
-                            presentManagement(.createRoom(placeID: place.id))
-                        }
-                    }
-                } else {
-                    ContentUnavailableView {
-                        Label("No Places", systemImage: "house")
-                    } description: {
-                        Text("Create a Place to start cataloguing your things.")
-                    } actions: {
-                        Button("New Place", systemImage: "plus") {
-                            presentManagement(.createPlace)
-                        }
-                    }
-                }
-            }
+            .accessibilityIdentifier("browse.placesList")
         }
     }
 
-    private var currentPlace: PlaceSnapshot? {
-        store.activePlaces.first(where: { $0.id == selection.placeID }) ?? store.activePlaces.first
+    private func presentManagement(_ route: ManagementRoute) {
+        managementPresentation = ManagementPresentation(route: route)
     }
 }
 
 private struct PlaceListView: View {
     @ObservedObject var store: CatalogStore
     let place: PlaceSnapshot
-    let allPlaces: [PlaceSnapshot]
-    @Binding var selection: BrowseSelection
     let onSharePlace: (UUID) -> Void
-    let onPrintQRCodes: () -> Void
     let presentManagement: (ManagementRoute) -> Void
 
     var body: some View {
         List {
-            PlaceHeader(
-                place: place,
-                allPlaces: allPlaces,
-                selection: $selection,
-                onSharePlace: onSharePlace,
-                presentManagement: presentManagement
-            )
-            Section("Rooms") {
-                if place.activeRooms.isEmpty {
+            if place.activeRooms.isEmpty {
+                Section {
                     ContentUnavailableView(
                         "No Rooms Yet",
                         systemImage: "door.left.hand.open",
@@ -235,64 +102,42 @@ private struct PlaceListView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 }
-                ForEach(place.activeRooms) { room in
-                    NavigationLink(value: BrowseRoute.room(room.id)) {
-                        Label(room.name, systemImage: "door.left.hand.open")
+
+                Section {
+                    Button("New Room", systemImage: "plus") {
+                        presentManagement(.createRoom(placeID: place.id))
                     }
                 }
-                Button("New Room", systemImage: "plus") {
-                    presentManagement(.createRoom(placeID: place.id))
+            } else {
+                Section("Rooms") {
+                    ForEach(place.activeRooms) { room in
+                        NavigationLink(value: BrowseRoute.room(room.id)) {
+                            Label(room.name, systemImage: "door.left.hand.open")
+                        }
+                    }
+                    Button("New Room", systemImage: "plus") {
+                        presentManagement(.createRoom(placeID: place.id))
+                    }
                 }
             }
         }
+        .navigationTitle(place.name)
         .refreshable { await store.reload() }
         .accessibilityIdentifier("browse.placeList")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
-                    .labelStyle(.iconOnly)
-            }
-        }
-    }
-}
-
-private struct PlaceHeader: View {
-    let place: PlaceSnapshot
-    let allPlaces: [PlaceSnapshot]
-    @Binding var selection: BrowseSelection
-    let onSharePlace: (UUID) -> Void
-    let presentManagement: (ManagementRoute) -> Void
-
-    var body: some View {
-        Section {
-            HStack {
-                Menu {
-                    ForEach(allPlaces) { candidate in
-                        Button {
-                            selection.selectPlace(candidate.id, from: allPlaces)
-                        } label: {
-                            if candidate.id == place.id {
-                                Label(candidate.name, systemImage: "checkmark")
-                            } else {
-                                Text(candidate.name)
-                            }
-                        }
+            ToolbarItemGroup(placement: .primaryAction) {
+                if store.isPlaceShared(place.id) {
+                    Button("Shared", systemImage: "person.2") {
+                        onSharePlace(place.id)
                     }
-                    Divider()
-                    Button("New Place", systemImage: "plus") {
-                        presentManagement(.createPlace)
+                }
+                Menu("Place Actions", systemImage: "ellipsis") {
+                    Button("Rename Place", systemImage: "pencil") {
+                        presentManagement(.editPlace(place.id))
                     }
-                } label: {
-                    Label(place.name, systemImage: "house")
-                        .font(.headline)
-                }
-                Spacer()
-                Button("Edit Place", systemImage: "pencil") {
-                    presentManagement(.editPlace(place.id))
-                }
-                .labelStyle(.iconOnly)
-                Button("Share Place", systemImage: "person.crop.circle.badge.plus") {
-                    onSharePlace(place.id)
+                    Button("Share Place", systemImage: "person.crop.circle.badge.plus") {
+                        onSharePlace(place.id)
+                    }
                 }
                 .labelStyle(.iconOnly)
             }
@@ -303,10 +148,22 @@ private struct PlaceHeader: View {
 private struct BrowseDestinationView: View {
     @ObservedObject var store: CatalogStore
     let route: BrowseRoute
+    let onSharePlace: (UUID) -> Void
     let presentManagement: (ManagementRoute) -> Void
 
     var body: some View {
         switch route {
+        case .place(let id):
+            if let place = store.activePlaces.first(where: { $0.id == id }) {
+                PlaceListView(
+                    store: store,
+                    place: place,
+                    onSharePlace: onSharePlace,
+                    presentManagement: presentManagement
+                )
+            } else {
+                unavailable("Place", systemImage: "house")
+            }
         case .room(let id):
             RoomDetailView(store: store, roomID: id, presentManagement: presentManagement)
         case .area(let id):
@@ -378,42 +235,72 @@ private struct AreaDetailView: View {
     @ObservedObject var store: CatalogStore
     let areaID: UUID
     let presentManagement: (ManagementRoute) -> Void
+    @State private var showsQRScanner = false
 
     var body: some View {
         Group {
             if let place = activePlace, let area = place.activeAreas.first(where: { $0.id == areaID }) {
-                List {
-                    CatalogLocationSummary(
-                        photo: area.primaryPhoto, detail: area.detail, hasQRCode: area.hasQRCode)
-                    Section("Contents") {
-                        let things = place.activeThings(in: .area(area.id))
-                        let containers = place.activeContainers(inArea: area.id)
-                        if things.isEmpty && containers.isEmpty { Text("Empty").foregroundStyle(.secondary) }
-                        ForEach(things) { thing in
-                            NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                ThingRow(store: store, thing: thing)
+                VStack(alignment: .leading, spacing: 0) {
+                    if let detail = area.detail, !detail.isEmpty {
+                        Text(detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
+                    }
+                    List {
+                        CatalogLocationSummary(photo: area.primaryPhoto, detail: nil)
+                        Section("Contents") {
+                            let things = place.activeThings(in: .area(area.id))
+                            let containers = place.activeContainers(inArea: area.id)
+                            if things.isEmpty && containers.isEmpty {
+                                Text("Empty").foregroundStyle(.secondary)
                             }
-                        }
-                        ForEach(containers) { container in
-                            NavigationLink(value: BrowseRoute.container(container.id)) {
-                                Label(container.name, systemImage: "shippingbox")
+                            ForEach(things) { thing in
+                                NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                    ThingRow(store: store, thing: thing)
+                                }
                             }
-                        }
-                        Menu("New", systemImage: "plus") {
-                            Button("Container", systemImage: "shippingbox") {
-                                presentManagement(.createContainer(destination: .area(area.id)))
+                            ForEach(containers) { container in
+                                NavigationLink(value: BrowseRoute.container(container.id)) {
+                                    Label(container.name, systemImage: "shippingbox")
+                                }
                             }
-                            Button("Thing", systemImage: "square.grid.2x2") {
-                                presentManagement(.createThing(destination: .area(area.id)))
+                            Menu("New", systemImage: "plus") {
+                                Button("Container", systemImage: "shippingbox") {
+                                    presentManagement(.createContainer(destination: .area(area.id)))
+                                }
+                                Button("Thing", systemImage: "square.grid.2x2") {
+                                    presentManagement(.createThing(destination: .area(area.id)))
+                                }
                             }
                         }
                     }
                 }
+                .background(Color(uiColor: .systemGroupedBackground))
                 .navigationTitle(area.name)
+                .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Edit", systemImage: "pencil") { presentManagement(.editArea(area.id)) }
-                            .labelStyle(.iconOnly)
+                        Menu("Storage Area Actions", systemImage: "ellipsis") {
+                            Button("Edit", systemImage: "pencil") {
+                                presentManagement(.editArea(area.id))
+                            }
+                            Button(
+                                area.hasQRCode ? "Reattach QR Code" : "Attach QR Code",
+                                systemImage: "qrcode.viewfinder"
+                            ) {
+                                showsQRScanner = true
+                            }
+                        }
+                        .labelStyle(.iconOnly)
+                    }
+                }
+                .fullScreenCover(isPresented: $showsQRScanner) {
+                    let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
+                    QRAssignmentScanner(store: store, expectedTarget: target) { token in
+                        try await store.replaceQRCode(token, target: target)
                     }
                 }
             } else {
@@ -431,6 +318,7 @@ private struct ContainerDetailView: View {
     @ObservedObject var store: CatalogStore
     let containerID: UUID
     let presentManagement: (ManagementRoute) -> Void
+    @State private var showsQRScanner = false
 
     var body: some View {
         Group {
@@ -440,8 +328,7 @@ private struct ContainerDetailView: View {
                 List {
                     CatalogLocationSummary(
                         photo: container.primaryPhoto,
-                        detail: container.detail,
-                        hasQRCode: container.hasQRCode
+                        detail: container.detail
                     )
                     Section("Contents") {
                         let things = place.activeThings(in: .container(container.id))
@@ -470,10 +357,24 @@ private struct ContainerDetailView: View {
                 .navigationTitle(container.name)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Edit", systemImage: "pencil") {
-                            presentManagement(.editContainer(container.id))
+                        Menu("Container Actions", systemImage: "ellipsis") {
+                            Button("Edit", systemImage: "pencil") {
+                                presentManagement(.editContainer(container.id))
+                            }
+                            Button(
+                                container.hasQRCode ? "Reattach QR Code" : "Attach QR Code",
+                                systemImage: "qrcode.viewfinder"
+                            ) {
+                                showsQRScanner = true
+                            }
                         }
                         .labelStyle(.iconOnly)
+                    }
+                }
+                .fullScreenCover(isPresented: $showsQRScanner) {
+                    let target = QRBindingTarget.container(QRTargetID(rawValue: container.id))
+                    QRAssignmentScanner(store: store, expectedTarget: target) { token in
+                        try await store.replaceQRCode(token, target: target)
                     }
                 }
             } else {
@@ -490,7 +391,6 @@ private struct ContainerDetailView: View {
 private struct CatalogLocationSummary: View {
     let photo: PhotoAssetSnapshot?
     let detail: String?
-    let hasQRCode: Bool
 
     var body: some View {
         if photo != nil || detail?.isEmpty == false {
@@ -504,11 +404,6 @@ private struct CatalogLocationSummary: View {
                 }
                 if let detail, !detail.isEmpty { Text(detail) }
             }
-        }
-        Section("QR Code") {
-            Label(
-                hasQRCode ? "Attached" : "Not Attached",
-                systemImage: hasQRCode ? "qrcode" : "qrcode.viewfinder")
         }
     }
 }

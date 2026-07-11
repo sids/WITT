@@ -208,12 +208,20 @@ public struct CreateAreaDraft: Hashable, Sendable {
     public let name: String
     public let detail: String?
     public let photo: NormalizedPhoto?
+    public let qrToken: QRToken?
 
-    public init(roomID: UUID, name: String, detail: String? = nil, photo: NormalizedPhoto? = nil) {
+    public init(
+        roomID: UUID,
+        name: String,
+        detail: String? = nil,
+        photo: NormalizedPhoto? = nil,
+        qrToken: QRToken? = nil
+    ) {
         self.roomID = roomID
         self.name = name
         self.detail = detail
         self.photo = photo
+        self.qrToken = qrToken
     }
 }
 
@@ -241,17 +249,20 @@ public struct CreateContainerDraft: Hashable, Sendable {
     public let detail: String?
     public let destination: ContainerDestination
     public let photo: NormalizedPhoto?
+    public let qrToken: QRToken?
 
     public init(
         name: String,
         detail: String? = nil,
         destination: ContainerDestination,
-        photo: NormalizedPhoto? = nil
+        photo: NormalizedPhoto? = nil,
+        qrToken: QRToken? = nil
     ) {
         self.name = name
         self.detail = detail
         self.destination = destination
         self.photo = photo
+        self.qrToken = qrToken
     }
 }
 
@@ -396,6 +407,7 @@ public protocol CatalogRepository: QRCodeResolving {
     func saveThing(_ draft: ReviewedThingDraft, to destination: ThingDestination) async throws -> ThingSnapshot
     func unassignedQRCodeTargets() async throws -> [QRAttachTargetSnapshot]
     @discardableResult func bindQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
+    @discardableResult func replaceQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
     @discardableResult func createTargetAndBindQRCode(
         _ request: CreateAndBindQRCodeRequest
     ) async throws -> QRAttachTargetSnapshot

@@ -90,6 +90,15 @@ final class PlaceSharingTests: XCTestCase {
     }
 
     func testSharingStateMapsCloudKitRolesAndPermissions() {
+        XCTAssertFalse(PlaceSharingState.notShared.isShared)
+        XCTAssertTrue(
+            PlaceSharingState(
+                role: .owner,
+                permission: .readWrite,
+                publicPermission: .none,
+                participants: []
+            ).isShared
+        )
         XCTAssertEqual(PlaceSharingState.role(for: .owner), .owner)
         XCTAssertEqual(PlaceSharingState.role(for: .administrator), .administrator)
         XCTAssertEqual(PlaceSharingState.role(for: .privateUser), .participant)

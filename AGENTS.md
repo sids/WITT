@@ -41,6 +41,7 @@ QR codes are central to the experience:
 5. Scanning a known QR code should open the add-item flow: take a photo, immediately use AI to label and keyword it, then let the user review, edit, and save.
 6. Things do not need QR codes for the MVP.
 7. Rooms do not need QR codes for now.
+8. New Storage Areas and Containers may scan an unused QR code before saving. Existing targets attach or reattach from their ellipsis menu. Reattaching replaces that target's former binding and releases the old label, but must never take a code already attached elsewhere.
 
 AI is expected for photo understanding, item labeling, and keyword/tag generation. Assume an OpenAI-compatible API, but keep provider details isolated so the implementation can change later.
 
@@ -54,18 +55,19 @@ Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
-The repo now contains the sixth integrated implementation milestone:
+The repo now contains the seventh integrated implementation milestone:
 
 - The Browse, Search, Thing detail, known-QR add Thing, and unknown-QR attach/create flows now use immutable snapshots from `CoreDataCatalogRepository`; `DemoInventoryStore` has been removed.
-- Browse opens by default and presents one current Place with switching and creation, Place-local edit/share actions, useful empty states, and contextual New Room, Storage Area, Container, and Thing controls. Familiar QR and pencil toolbar actions stay explicit instead of collapsing into ellipsis menus.
+- Browse opens by default on a Places-rooted navigation stack. The Places screen lists every Place and owns New Place and Print QR Labels. Selecting a Place pushes its Rooms screen, titled with the Place name; Rename Place and Share Place live in its ellipsis menu, and an already-shared Place also shows a separate Shared management button immediately before that menu. Contextual New Room, Storage Area, Container, and Thing controls remain in their owning screens.
 - Real AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, and duplicate suppression. Scanned known destinations and unknown tokens are preserved through routing.
 - Camera and Photos picker adapters normalize orientation, strip metadata, cap full images at 2048 px, create 320 px thumbnails, and persist explicit `PhotoAsset` records.
 - The confirmed `iCloud.in.sids.witt` container, iCloud/remote-notification entitlements, private/shared Core Data stores, Place-rooted read/write sharing UI, and invitation acceptance are wired.
 - The one-screen create-and-attach flow can atomically create or select a Room, Storage Area, and Container before binding a scanned QR code.
+- New Storage Area and Container forms can scan and atomically bind an unused QR label. Existing target screens use a shared full-screen scanner for Attach/Reattach; replacement releases the former label while refusing codes attached elsewhere. QR status is not shown in the content layer.
 - Printable random QR sheets support A4, US Letter, and configurable continuous Thermal Roll layouts with metric width, QRs per row, spacing, margins, geometry validation, two label styles, crisp high-contrast codes, Quick Look preview, and the native share/print flow without persisting unbound tokens.
 - Explicit repository and store contracts cover manual create, edit, same-Place move, photo replacement/removal, and cascading archive for Place, Room, Storage Area, Container, and Thing. Native one-screen management forms, context-aware add menus, live detail navigation, archive confirmations, and iPhone/iPad Browse integration are implemented.
 - A Responses-compatible vision adapter validates normalized JPEGs, requests strict structured suggestions with provider storage disabled, maps transport/provider failures, and is injected into both Thing-creation paths. Runtime configuration is environment-only through `WITT_AI_RESPONSES_URL`, `WITT_AI_MODEL`, and `WITT_AI_BEARER_TOKEN`; no provider secret belongs in the app bundle. Debug builds use the deterministic mock only when no AI configuration is present, while unconfigured release builds fail honestly into manual entry.
-- The `wittTests` target has 102 passing simulator tests covering persistence, containment and management mutations, QR routing/scanning/printing and thermal geometry, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
+- The `wittTests` target has 108 passing simulator tests covering persistence, containment and management mutations, atomic QR creation/replacement, QR routing/scanning/printing and thermal geometry, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 

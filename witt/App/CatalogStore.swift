@@ -6,6 +6,7 @@ import Foundation
 final class CatalogStore: ObservableObject {
     @Published private(set) var places: [PlaceSnapshot] = []
     @Published private(set) var unassignedQRCodeTargets: [QRAttachTargetSnapshot] = []
+    @Published private(set) var placeSharingStates: [UUID: PlaceSharingState] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var hasLoaded = false
     @Published var errorMessage: String?
@@ -44,6 +45,10 @@ final class CatalogStore: ObservableObject {
         return place.activeRooms.first.map {
             .room($0.id)
         }
+    }
+
+    func isPlaceShared(_ placeID: UUID) -> Bool {
+        placeSharingStates[placeID]?.isShared == true
     }
 
     func createPlace(_ draft: CreatePlaceDraft) async -> PlaceSnapshot? {
@@ -134,6 +139,17 @@ final class CatalogStore: ObservableObject {
         }
     }
 
+    func resolveQRCode(_ token: QRToken) async throws -> QRCodeResolution {
+        try await repository.resolve(token)
+    }
+
+    func replaceQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
+        _ = try await repository.replaceQRCode(
+            QRCodeBindingRequest(token: token, target: target)
+        )
+        try await reloadCatalog()
+    }
+
     func bind(_ token: QRToken, to target: QRAttachTargetSnapshot) async -> Bool {
         do {
             _ = try await repository.bindQRCode(
@@ -198,6 +214,30 @@ final class CatalogStore: ObservableObject {
     private func reloadCatalog() async throws {
         places = try await repository.fetchPlaces()
         unassignedQRCodeTargets = try await repository.unassignedQRCodeTargets()
+        refreshPlaceSharingStates()
+    }
+
+    private func refreshPlaceSharingStates() {
+        let activePlaceIDs = activePlaces.map(\.id)
+        guard !activePlaceIDs.isEmpty else {
+            placeSharingStates = [:]
+            return
+        }
+
+        let request = NSFetchRequest<Place>(entityName: "Place")
+        request.predicate = NSPredicate(format: "id IN %@", activePlaceIDs)
+
+        guard let managedPlaces = try? persistence.viewContext.fetch(request) else {
+            placeSharingStates = [:]
+            return
+        }
+
+        placeSharingStates = managedPlaces.reduce(into: [:]) { states, place in
+            guard let id = place.id,
+                let state = try? sharingService.state(for: place)
+            else { return }
+            states[id] = state
+        }
     }
 
     private func performMutation<Result>(

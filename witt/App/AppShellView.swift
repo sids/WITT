@@ -81,7 +81,9 @@ struct AppShellView: View {
                 }
             }
         }
-        .sheet(item: $sharingSheet) { item in
+        .sheet(item: $sharingSheet, onDismiss: {
+            Task { await store.reload() }
+        }) { item in
             PlaceSharingActivityView(presentation: item.presentation) { result in
                 if case .failure(let error) = result {
                     deepLinkAlert = DeepLinkAlert(

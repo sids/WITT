@@ -44,7 +44,7 @@ The Core Data schema in [`WITT.xcdatamodel`](../witt/WITT.xcdatamodeld/WITT.xcda
 
 New Places are assigned to the private store when CloudKit is active. Descendants, keywords, QR codes, and photos are explicitly assigned to the persistent store containing their Place. This avoids cross-store relationships and ensures edits to a shared Place stay in the shared store. The in-memory configuration uses one local store for tests and previews.
 
-[`CatalogStore`](../witt/App/CatalogStore.swift) is the main-actor application store. It wraps the repository, publishes `[PlaceSnapshot]`, unassigned QR targets, loading/error state, and reloads after every successful mutation. It also bridges Place sharing because Apple's sharing APIs require the saved managed-object root. Views depend on the store and snapshots, not fetch requests or managed-object lifetimes.
+[`CatalogStore`](../witt/App/CatalogStore.swift) is the main-actor application store. It wraps the repository, publishes `[PlaceSnapshot]`, unassigned QR targets, loading/error state, and per-Place sharing state, and reloads after every successful mutation. It also bridges Place sharing because Apple's sharing APIs require the saved managed-object root. Views depend on the store and snapshots, not fetch requests or managed-object lifetimes.
 
 ## CloudKit stores, sharing, and change propagation
 
@@ -73,7 +73,9 @@ This is the MVP production candidate, not a temporary file cache. A hybrid paylo
 
 [`QRToken`](../witt/QR/QRToken.swift) is a canonical 128-bit random value encoded as 22 unpadded base64url characters using `SecRandomCopyBytes`. [`WITTQRCodeURL`](../witt/QR/WITTQRCodeURL.swift) is the strict, versioned URL envelope: `witt://qr/v1/<token>`. Parsing rejects alternate casing/serialization, credentials, ports, query strings, fragments, unknown versions, and noncanonical tokens.
 
-`QRCodeResolving` and [`QRCodeResolution`](../witt/QR/QRCodeResolution.swift) isolate token lookup from routing. The repository returns known Area, known Container, unknown, needs-repair, or conflict. Binding is idempotent only for the same token/target pair; otherwise a token already in storage or a target with an existing bound code is rejected. `createTargetAndBindQRCode` creates or selects the Room and Area, optionally creates or selects a Container, and binds the token in one Core Data transaction.
+`QRCodeResolving` and [`QRCodeResolution`](../witt/QR/QRCodeResolution.swift) isolate token lookup from routing. The repository returns known Area, known Container, unknown, needs-repair, or conflict. Ordinary binding is idempotent only for the same token/target pair; otherwise a token already in storage or a target with an existing bound code is rejected. `createTargetAndBindQRCode` creates or selects the Room and Area, optionally creates or selects a Container, and binds the token in one Core Data transaction.
+
+`CreateAreaDraft` and `CreateContainerDraft` may carry an unused QR token, allowing the target and binding to be saved atomically with its name, detail, photo, and parent. Explicit replacement is also transactional: it accepts an unused token, deletes the target's former QR rows, and binds the new token in the target's persistent store. The former label then resolves as unknown and can be reused. A token attached to any other target is rejected without mutation; WITT never silently moves a binding across targets or Places.
 
 [`QRDeepLinkRouter`](../witt/App/QRDeepLinkRouter.swift) converts known destinations to add-Thing routes and unknown tokens to attach routes. QR identity belongs only to Areas and Containers; Rooms and Things are intentionally outside the binding model.
 
@@ -91,7 +93,7 @@ Thing photo capture is isolated behind SwiftUI adapters in [`CameraCaptureView.s
 
 QR scanning is a separate AVFoundation pipeline. [`QRScannerSession`](../witt/Scanning/QRScannerSession.swift) owns camera input, metadata output, QR-only decoding, the serial session queue, torch changes, and start/stop intent. [`QRScannerView`](../witt/Scanning/QRScannerView.swift) owns permission and lifecycle presentation, pauses for inactive scenes or overlaid flows, updates preview rotation from interface orientation, and reports denied, unavailable, and failed states explicitly. `QRScannerPayloadDeduplicator` suppresses repeated reads of the same payload for 1.5 seconds by default and resets when the session stops.
 
-The scanner emits only strings. URL validation, token parsing, persistence resolution, and user routing remain outside AVFoundation, which keeps hardware behavior independently testable from QR semantics.
+The scanner emits only strings. URL validation, token parsing, persistence resolution, and user routing remain outside AVFoundation, which keeps hardware behavior independently testable from QR semantics. `QRAssignmentScanner` composes the same hardware view for Storage Area and Container creation and replacement: it accepts only canonical WITT URLs, pauses during resolution, accepts unknown tokens or the target's existing token, and keeps invalid, already-attached, repair, and conflict errors local to the scanner.
 
 ## AI labeling boundary
 
@@ -103,13 +105,13 @@ The current Responses-compatible transport, deterministic debug mock, environmen
 
 The app uses standard iOS 26 SwiftUI containers and system appearance. `AppShellView` owns app-level navigation and modal state; `CatalogStore` owns loaded catalog state; feature views own short-lived form, query, selection, camera, and progress state.
 
-Browse adapts between `NavigationStack` and `NavigationSplitView`, keeps a Place/Room selection, and resolves destinations by stable UUID against the latest snapshots. Find performs in-memory matching over active Thing names, keywords, and location components. Thing details and management forms also resolve current snapshots by ID, so a reload does not leave a view holding a stale managed object.
+Browse uses a Places-rooted `NavigationStack` on iPhone and iPad and resolves Place, Room, Storage Area, Container, and Thing destinations by stable UUID against the latest snapshots. Each Place's Rooms screen reads the store's cached CloudKit sharing state to expose system share management contextually. Find performs in-memory matching over active Thing names, keywords, and location components. Thing details and management forms also resolve current snapshots by ID, so a reload does not leave a view holding a stale managed object. Creation forms use local focus state to focus the primary name field without applying that behavior to edit forms.
 
-Creation and editing are routed through `ManagementRoute` and one-screen forms in [`Features/Management`](../witt/Features/Management). Draft state is converted to typed repository mutations only on commit. Context-aware destination choices are derived from the active Place graph; Container choices exclude the edited Container and its descendants. Archive confirmation copy uses computed subtree impact. Unknown QR attachment uses dedicated state in [`AttachQRCodeView.swift`](../witt/Features/Scan/AttachQRCodeView.swift), showing unassigned Areas and Containers first and falling through to the atomic create-and-bind flow.
+Creation and editing are routed through `ManagementRoute` and one-screen forms in [`Features/Management`](../witt/Features/Management). Draft state is converted to typed repository mutations only on commit. New Storage Area and Container forms can hold a scanned unused token until the complete draft is saved atomically. Context-aware destination choices are derived from the active Place graph; Container choices exclude the edited Container and its descendants. Archive confirmation copy uses computed subtree impact. Unknown QR attachment uses dedicated state in [`AttachQRCodeView.swift`](../witt/Features/Scan/AttachQRCodeView.swift), showing unassigned Areas and Containers first and falling through to the atomic create-and-bind flow.
 
 ## Testing seams and baseline
 
-The `wittTests` target currently contains 102 simulator tests. The baseline covers:
+The `wittTests` target currently contains 108 simulator tests. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, and QR mutations;
@@ -130,6 +132,6 @@ The implemented app shell, repository, photo pipeline, scanner, QR printing, sha
 3. Put AI behind a WITT-owned relay or another short-lived credential mechanism. Never ship a long-lived provider API key in the app bundle. Select the production model, endpoint policy, retention/privacy disclosures, failure budget, and user-facing consent posture before enabling live labeling.
 4. Verify CloudKit production schema deployment, container/environment entitlements, push delivery, migration behavior, and App Store/TestFlight signing. The checked-in entitlement currently names the development push environment; release signing must resolve the production entitlement correctly.
 5. Run device coverage for camera permission transitions, QR focus/rotation/torch behavior, deep-link launch from a cold app, photo capture memory pressure, iPad presentation, physical A4/Letter printing, and representative thermal printers.
-6. Preserve the 102-test baseline and add focused regression coverage for any release-gate fixes. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
+6. Preserve the 108-test baseline and add focused regression coverage for any release-gate fixes. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
 
 These gates are validation and production-operations work, not a request to reopen settled domain boundaries. Place-rooted ownership, explicit Area/Container QR binding, provider-neutral AI, normalized photo inputs, and snapshot-based presentation remain the architectural constraints.

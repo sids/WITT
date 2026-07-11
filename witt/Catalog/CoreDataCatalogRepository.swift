@@ -115,6 +115,11 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 guard Self.isActive(room), let place = room.place else {
                     throw CatalogRepositoryError.roomNotFound
                 }
+                if let qrToken = draft.qrToken {
+                    guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
+                        throw CatalogRepositoryError.tokenAlreadyBound
+                    }
+                }
                 let area: Area = Self.insert("Area", into: context)
                 area.name = try Self.requiredName(draft.name)
                 area.detail = Self.nilIfEmpty(draft.detail)
@@ -125,6 +130,18 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 area.place = place
                 if let photo = draft.photo {
                     try Self.applyPhotoMutation(.replace(photo), to: .area(area), in: context)
+                }
+                if let qrToken = draft.qrToken {
+                    try Self.insertQRCode(
+                        qrToken,
+                        for: QRTargetObject(
+                            objectID: area.objectID,
+                            place: place,
+                            qrCodes: area.qrCodes,
+                            target: .area(try Self.requiredID(area.id))
+                        ),
+                        in: context
+                    )
                 }
                 area.updatedAt = Date()
                 Self.assignInsertions(in: context, toStoreOf: place)
@@ -144,6 +161,11 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
             context.reset()
             do {
                 let parent = try Self.fetchContainerDestination(draft.destination, in: context)
+                if let qrToken = draft.qrToken {
+                    guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
+                        throw CatalogRepositoryError.tokenAlreadyBound
+                    }
+                }
                 let container: Container = Self.insert("Container", into: context)
                 container.name = try Self.requiredName(draft.name)
                 container.detail = Self.nilIfEmpty(draft.detail)
@@ -152,6 +174,18 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 parent.apply(to: container)
                 if let photo = draft.photo {
                     try Self.applyPhotoMutation(.replace(photo), to: .container(container), in: context)
+                }
+                if let qrToken = draft.qrToken {
+                    try Self.insertQRCode(
+                        qrToken,
+                        for: QRTargetObject(
+                            objectID: container.objectID,
+                            place: parent.place,
+                            qrCodes: container.qrCodes,
+                            target: .container(try Self.requiredID(container.id))
+                        ),
+                        in: context
+                    )
                 }
                 container.updatedAt = Date()
                 Self.assignInsertions(in: context, toStoreOf: parent.place)
@@ -547,16 +581,43 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                     throw CatalogRepositoryError.targetAlreadyHasQRCode
                 }
 
-                let qrCode: QRCode = Self.insert("QRCode", into: context)
-                qrCode.token = request.token.rawValue
-                qrCode.state = "bound"
-                qrCode.boundAt = Date()
-                qrCode.place = target.place
-                target.apply(to: qrCode)
-                if let store = target.objectID.persistentStore {
-                    context.assign(qrCode, to: store)
+                try Self.insertQRCode(request.token, for: target, in: context)
+                try context.save()
+                return QRCodeBinding(token: request.token, target: request.target)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    @discardableResult
+    public func replaceQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let target = try Self.fetchQRTarget(request.target, in: context)
+                let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
+                let isSameTarget = existing.count == 1
+                    && existing[0].state == "bound"
+                    && existing[0].place === target.place
+                    && Self.bindingTarget(for: existing[0]) == target.target
+
+                guard existing.isEmpty || isSameTarget else {
+                    throw CatalogRepositoryError.tokenAlreadyBound
                 }
-                try ManagedObjectDomainValidator.validate(qrCode)
+
+                let retainedQRCode = isSameTarget ? existing[0] : nil
+                for qrCode in Self.managedObjects(target.qrCodes, as: QRCode.self)
+                    where qrCode !== retainedQRCode
+                {
+                    context.delete(qrCode)
+                }
+                if retainedQRCode == nil {
+                    try Self.insertQRCode(request.token, for: target, in: context)
+                }
+
                 try context.save()
                 return QRCodeBinding(token: request.token, target: request.target)
             } catch {
@@ -599,12 +660,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                     throw CatalogRepositoryError.targetAlreadyHasQRCode
                 }
 
-                let qrCode: QRCode = Self.insert("QRCode", into: context)
-                qrCode.token = request.token.rawValue
-                qrCode.state = "bound"
-                qrCode.boundAt = Date()
-                qrCode.place = place
-                target.apply(to: qrCode)
+                try Self.insertQRCode(request.token, for: target, in: context)
 
                 let inserted = Array(context.insertedObjects)
                 if let store = place.objectID.persistentStore {
@@ -1112,6 +1168,23 @@ private extension CoreDataCatalogRepository {
         request.predicate = NSPredicate(format: "token == %@", token)
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true), NSSortDescriptor(key: "id", ascending: true)]
         return try context.fetch(request)
+    }
+
+    static func insertQRCode(
+        _ token: QRToken,
+        for target: QRTargetObject,
+        in context: NSManagedObjectContext
+    ) throws {
+        let qrCode: QRCode = insert("QRCode", into: context)
+        qrCode.token = token.rawValue
+        qrCode.state = "bound"
+        qrCode.boundAt = Date()
+        qrCode.place = target.place
+        target.apply(to: qrCode)
+        if let store = target.objectID.persistentStore {
+            context.assign(qrCode, to: store)
+        }
+        try ManagedObjectDomainValidator.validate(qrCode)
     }
 
     nonisolated static func bindingTarget(for qrCode: QRCode) -> RawQRTarget? {

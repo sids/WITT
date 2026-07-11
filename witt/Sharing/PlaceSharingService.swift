@@ -59,6 +59,10 @@ nonisolated public struct PlaceSharingState: Equatable, Sendable {
         participants: []
     )
 
+    public var isShared: Bool {
+        role != .notShared
+    }
+
     init(share: CKShare) {
         let currentUser = share.currentUserParticipant
         role = Self.role(for: currentUser?.role)

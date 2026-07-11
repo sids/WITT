@@ -78,6 +78,48 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertEqual(ManagementAIDecision.afterSelectingPhoto(isCreating: false), .skip)
     }
 
+    func testQRAssignmentDecisionAcceptsUnknownAndExpectedTargetsWithoutStealing() {
+        let areaID = QRTargetID(rawValue: UUID())
+        let containerID = QRTargetID(rawValue: UUID())
+
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(resolution: .unknown, expectedTarget: nil),
+            .assign
+        )
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(
+                resolution: .knownArea(areaID), expectedTarget: .area(areaID)),
+            .accept
+        )
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(
+                resolution: .knownContainer(containerID), expectedTarget: .area(areaID)),
+            .alreadyAttached
+        )
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(
+                resolution: .knownArea(areaID), expectedTarget: nil),
+            .alreadyAttached
+        )
+    }
+
+    func testQRAssignmentDecisionKeepsRepairAndConflictDistinct() {
+        let target = QRBindingTarget.area(QRTargetID(rawValue: UUID()))
+        let repair = QRCodeRepair(reason: .missingTarget)
+        let conflict = QRCodeConflict(firstTarget: target, secondTarget: target)
+
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(
+                resolution: .needsRepair(repair), expectedTarget: target),
+            .needsRepair
+        )
+        XCTAssertEqual(
+            QRAssignmentDecision.evaluate(
+                resolution: .conflict(conflict), expectedTarget: target),
+            .conflict
+        )
+    }
+
     func testAISuggestionOnlyClaimsNameWhenItSuppliesTheName() {
         let suggestion = ThingLabelSuggestion(
             proposedName: "Flashlight",
