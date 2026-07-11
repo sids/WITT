@@ -2,6 +2,176 @@ import XCTest
 @testable import witt
 
 final class CatalogPresentationTests: XCTestCase {
+    func testBrowseRouteEncodesAndDecodesEveryDestination() throws {
+        let id = UUID()
+        let routes: [BrowseRoute] = [
+            .place(id), .room(id), .area(id), .container(id), .thing(id)
+        ]
+
+        for route in routes {
+            let data = try JSONEncoder().encode(route)
+            XCTAssertEqual(try JSONDecoder().decode(BrowseRoute.self, from: data), route)
+        }
+    }
+
+    func testBrowseRestorationBuildsRoomAndAreaPaths() {
+        let fixture = nestedFixture()
+
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .room(fixture.roomID), in: [fixture.place]),
+            [.place(fixture.place.id), .room(fixture.roomID)]
+        )
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .area(fixture.areaID), in: [fixture.place]),
+            [.place(fixture.place.id), .room(fixture.roomID), .area(fixture.areaID)]
+        )
+    }
+
+    func testBrowseRestorationBuildsArbitrarilyNestedContainerPath() {
+        let fixture = nestedFixture()
+
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .container(fixture.innerID), in: [fixture.place]),
+            [
+                .place(fixture.place.id),
+                .room(fixture.roomID),
+                .area(fixture.areaID),
+                .container(fixture.outerID),
+                .container(fixture.innerID)
+            ]
+        )
+    }
+
+    func testBrowseRestorationBuildsThingPathsForEveryHomeKind() {
+        let fixture = nestedFixture()
+        let roomThingID = UUID()
+        let areaThingID = UUID()
+        let containerThingID = UUID()
+        let place = makePlace(
+            name: fixture.place.name,
+            rooms: fixture.place.rooms,
+            areas: fixture.place.areas,
+            containers: fixture.place.containers,
+            things: [
+                thing(id: roomThingID, placeID: fixture.place.id, name: "Room Thing", home: .room(fixture.roomID)),
+                thing(id: areaThingID, placeID: fixture.place.id, name: "Area Thing", home: .area(fixture.areaID)),
+                thing(id: containerThingID, placeID: fixture.place.id, name: "Container Thing", home: .container(fixture.innerID))
+            ],
+            id: fixture.place.id
+        )
+
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .thing(roomThingID), in: [place]),
+            [.place(place.id), .room(fixture.roomID), .thing(roomThingID)]
+        )
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .thing(areaThingID), in: [place]),
+            [.place(place.id), .room(fixture.roomID), .area(fixture.areaID), .thing(areaThingID)]
+        )
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .thing(containerThingID), in: [place]),
+            [
+                .place(place.id),
+                .room(fixture.roomID),
+                .area(fixture.areaID),
+                .container(fixture.outerID),
+                .container(fixture.innerID),
+                .thing(containerThingID)
+            ]
+        )
+    }
+
+    func testBrowseRestorationUsesDestinationsCurrentParents() {
+        let fixture = nestedFixture()
+        let secondRoomID = UUID()
+        let thingID = UUID()
+        let movedPlace = makePlace(
+            name: fixture.place.name,
+            rooms: fixture.place.rooms + [
+                room(id: secondRoomID, placeID: fixture.place.id, name: "Studio")
+            ],
+            areas: fixture.place.areas.map { area in
+                guard area.id == fixture.areaID else { return area }
+                return self.area(
+                    id: area.id,
+                    placeID: area.placeID,
+                    roomID: secondRoomID,
+                    name: area.name
+                )
+            },
+            containers: fixture.place.containers.map { container in
+                guard container.id == fixture.innerID else { return container }
+                return self.container(
+                    id: container.id,
+                    placeID: container.placeID,
+                    name: container.name,
+                    parent: .room(fixture.roomID)
+                )
+            },
+            things: [
+                thing(
+                    id: thingID,
+                    placeID: fixture.place.id,
+                    name: "Lamp",
+                    home: .area(fixture.areaID)
+                )
+            ],
+            id: fixture.place.id
+        )
+
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .area(fixture.areaID), in: [movedPlace]),
+            [.place(movedPlace.id), .room(secondRoomID), .area(fixture.areaID)]
+        )
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .container(fixture.innerID), in: [movedPlace]),
+            [.place(movedPlace.id), .room(fixture.roomID), .container(fixture.innerID)]
+        )
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .thing(thingID), in: [movedPlace]),
+            [.place(movedPlace.id), .room(secondRoomID), .area(fixture.areaID), .thing(thingID)]
+        )
+    }
+
+    func testBrowseRestorationRejectsArchivedMissingAndCyclicHierarchy() {
+        let placeID = UUID()
+        let roomID = UUID()
+        let archivedContainerID = UUID()
+        let cycleA = UUID()
+        let cycleB = UUID()
+        let place = makePlace(
+            name: "Home",
+            rooms: [room(id: roomID, placeID: placeID, name: "Garage")],
+            containers: [
+                container(
+                    id: archivedContainerID,
+                    placeID: placeID,
+                    name: "Archived",
+                    parent: .room(roomID),
+                    archived: true
+                ),
+                container(id: cycleA, placeID: placeID, name: "Cycle A", parent: .container(cycleB)),
+                container(id: cycleB, placeID: placeID, name: "Cycle B", parent: .container(cycleA))
+            ],
+            id: placeID
+        )
+
+        XCTAssertNil(BrowsePathRestorer.path(to: .container(archivedContainerID), in: [place]))
+        XCTAssertNil(BrowsePathRestorer.path(to: .container(UUID()), in: [place]))
+        XCTAssertNil(BrowsePathRestorer.path(to: .container(cycleA), in: [place]))
+    }
+
+    func testBrowseRestorationHandlesRootAndMissingSavedDestination() {
+        let place = makePlace(name: "Home")
+
+        XCTAssertEqual(BrowsePathRestorer.path(to: nil, in: [place]), [])
+        XCTAssertEqual(
+            BrowsePathRestorer.path(to: .place(place.id), in: [place]),
+            [.place(place.id)]
+        )
+        XCTAssertNil(BrowsePathRestorer.path(to: .place(UUID()), in: [place]))
+    }
+
     func testDestinationPathDoesNotMatchTheWrongPlace() {
         let first = makePlace(name: "Home")
         let secondID = UUID()
@@ -312,9 +482,10 @@ final class CatalogPresentationTests: XCTestCase {
         placeID: UUID,
         name: String,
         parent: ContainerSnapshotParent,
-        hasQRCode: Bool = false
+        hasQRCode: Bool = false,
+        archived: Bool = false
     ) -> ContainerSnapshot {
-        ContainerSnapshot(id: id, placeID: placeID, name: name, detail: nil, sortOrder: 0, archivedAt: nil, parent: parent, primaryPhoto: nil, hasQRCode: hasQRCode)
+        ContainerSnapshot(id: id, placeID: placeID, name: name, detail: nil, sortOrder: 0, archivedAt: archived ? Date() : nil, parent: parent, primaryPhoto: nil, hasQRCode: hasQRCode)
     }
 
     private func thing(id: UUID, placeID: UUID, name: String, home: ThingSnapshotHome) -> ThingSnapshot {

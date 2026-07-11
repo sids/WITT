@@ -59,6 +59,8 @@ Browse opens by default on a Places screen. It lists every active Place as a nav
 
 Browse follows the same explicit hierarchy on iPhone and iPad: Places, Place, Room, Storage Area or Container, then Thing. The presentation may use available iPad space where it does not obscure this hierarchy, but Places remain the navigation root. Empty states provide the next useful creation action.
 
+WITT remembers the deepest Browse destination across launches and restores it after the catalog loads, rebuilding the current hierarchy when that destination has moved. Returning to Places is an intentional restorable state; a missing or archived saved destination falls back safely to Places.
+
 Creation is contextual:
 
 - A Place offers New Room.

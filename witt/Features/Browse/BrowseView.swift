@@ -1,12 +1,121 @@
 import SwiftUI
 import UIKit
 
-private enum BrowseRoute: Hashable {
+enum BrowseRoute: Hashable, Codable {
     case place(UUID)
     case room(UUID)
     case area(UUID)
     case container(UUID)
     case thing(UUID)
+}
+
+enum BrowsePathRestorer {
+    static func path(
+        to destination: BrowseRoute?,
+        in places: [PlaceSnapshot]
+    ) -> [BrowseRoute]? {
+        guard let destination else { return [] }
+
+        switch destination {
+        case .place(let placeID):
+            guard activePlace(id: placeID, in: places) != nil else { return nil }
+            return [.place(placeID)]
+        case .room(let roomID):
+            guard
+                let place = places.first(where: { place in
+                    place.archivedAt == nil && place.activeRooms.contains { $0.id == roomID }
+                })
+            else { return nil }
+            return [.place(place.id), .room(roomID)]
+        case .area(let areaID):
+            guard
+                let place = places.first(where: { place in
+                    place.archivedAt == nil && place.activeAreas.contains { $0.id == areaID }
+                }),
+                let area = place.activeAreas.first(where: { $0.id == areaID })
+            else { return nil }
+            return [.place(place.id), .room(area.roomID), .area(areaID)]
+        case .container(let containerID):
+            guard let place = activePlace(containingContainer: containerID, in: places) else {
+                return nil
+            }
+            return containerPath(to: containerID, in: place)
+        case .thing(let thingID):
+            guard
+                let place = places.first(where: { place in
+                    place.archivedAt == nil && place.activeThings.contains { $0.id == thingID }
+                }),
+                let thing = place.activeThings.first(where: { $0.id == thingID }),
+                let homePath = path(to: thing.home, in: place)
+            else { return nil }
+            return homePath + [.thing(thingID)]
+        }
+    }
+
+    private static func activePlace(id: UUID, in places: [PlaceSnapshot]) -> PlaceSnapshot? {
+        places.first { $0.id == id && $0.archivedAt == nil }
+    }
+
+    private static func activePlace(
+        containingContainer containerID: UUID,
+        in places: [PlaceSnapshot]
+    ) -> PlaceSnapshot? {
+        places.first { place in
+            place.archivedAt == nil && place.activeContainers.contains { $0.id == containerID }
+        }
+    }
+
+    private static func path(
+        to home: ThingSnapshotHome,
+        in place: PlaceSnapshot
+    ) -> [BrowseRoute]? {
+        switch home {
+        case .room(let roomID):
+            guard place.activeRooms.contains(where: { $0.id == roomID }) else { return nil }
+            return [.place(place.id), .room(roomID)]
+        case .area(let areaID):
+            guard let area = place.activeAreas.first(where: { $0.id == areaID }) else { return nil }
+            return [.place(place.id), .room(area.roomID), .area(areaID)]
+        case .container(let containerID):
+            return containerPath(to: containerID, in: place)
+        }
+    }
+
+    private static func containerPath(
+        to containerID: UUID,
+        in place: PlaceSnapshot
+    ) -> [BrowseRoute]? {
+        guard place.activeContainers.contains(where: { $0.id == containerID }) else { return nil }
+
+        var currentID = containerID
+        var visited = Set<UUID>()
+        var containerRoutes: [BrowseRoute] = []
+
+        while visited.insert(currentID).inserted {
+            guard
+                let container = place.containers.first(where: {
+                    $0.id == currentID && $0.placeID == place.id && $0.archivedAt == nil
+                })
+            else { return nil }
+
+            containerRoutes.append(.container(container.id))
+            switch container.parent {
+            case .room(let roomID):
+                guard place.activeRooms.contains(where: { $0.id == roomID }) else { return nil }
+                return [.place(place.id), .room(roomID)] + Array(containerRoutes.reversed())
+            case .area(let areaID):
+                guard let area = place.activeAreas.first(where: { $0.id == areaID }) else {
+                    return nil
+                }
+                return [.place(place.id), .room(area.roomID), .area(areaID)]
+                    + Array(containerRoutes.reversed())
+            case .container(let parentID):
+                currentID = parentID
+            }
+        }
+
+        return nil
+    }
 }
 
 private struct ManagementPresentation: Identifiable {
@@ -18,10 +127,13 @@ struct BrowseView: View {
     @ObservedObject var store: CatalogStore
     let onSharePlace: (UUID) -> Void
     let onPrintQRCodes: () -> Void
+    @AppStorage("witt.browse.savedDestination.v1") private var savedDestination = Data()
+    @State private var path: [BrowseRoute] = []
+    @State private var hasCompletedRestoration = false
     @State private var managementPresentation: ManagementPresentation?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if store.isLoading && store.activePlaces.isEmpty {
                     ProgressView("Loading Places")
@@ -52,6 +164,10 @@ struct BrowseView: View {
         .sheet(item: $managementPresentation) { presentation in
             ManagementSheet(store: store, route: presentation.route)
         }
+        .onAppear(perform: restoreIfReady)
+        .onChange(of: store.hasLoaded) { _, _ in restoreIfReady() }
+        .onChange(of: store.places) { _, _ in reconcilePathAfterReload() }
+        .onChange(of: path) { _, newPath in persistDeepestDestination(in: newPath) }
     }
 
     @ViewBuilder
@@ -79,6 +195,59 @@ struct BrowseView: View {
 
     private func presentManagement(_ route: ManagementRoute) {
         managementPresentation = ManagementPresentation(route: route)
+    }
+
+    private func restoreIfReady() {
+        guard store.hasLoaded, !hasCompletedRestoration else { return }
+
+        let destination: BrowseRoute?
+        if savedDestination.isEmpty {
+            destination = nil
+        } else if let decoded = try? JSONDecoder().decode(BrowseRoute.self, from: savedDestination) {
+            destination = decoded
+        } else {
+            savedDestination = Data()
+            destination = nil
+        }
+
+        let restoredPath = BrowsePathRestorer.path(to: destination, in: store.activePlaces)
+        setPathWithoutAnimation(restoredPath ?? [])
+        if restoredPath == nil {
+            savedDestination = Data()
+        }
+        hasCompletedRestoration = true
+    }
+
+    private func reconcilePathAfterReload() {
+        guard store.hasLoaded, hasCompletedRestoration, let destination = path.last else { return }
+
+        guard let reconciledPath = BrowsePathRestorer.path(to: destination, in: store.activePlaces) else {
+            savedDestination = Data()
+            setPathWithoutAnimation([])
+            return
+        }
+        if reconciledPath != path {
+            setPathWithoutAnimation(reconciledPath)
+        }
+    }
+
+    private func persistDeepestDestination(in path: [BrowseRoute]) {
+        guard hasCompletedRestoration else { return }
+        guard let destination = path.last else {
+            savedDestination = Data()
+            return
+        }
+        if let encoded = try? JSONEncoder().encode(destination) {
+            savedDestination = encoded
+        }
+    }
+
+    private func setPathWithoutAnimation(_ newPath: [BrowseRoute]) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            path = newPath
+        }
     }
 }
 
