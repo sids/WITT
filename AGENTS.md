@@ -68,21 +68,22 @@ Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
-The repo now contains the fifth integrated implementation milestone:
+The repo now contains the sixth integrated implementation milestone:
 
 - The Browse, Search, Thing detail, known-QR add Thing, and unknown-QR attach/create flows now use immutable snapshots from `CoreDataCatalogRepository`; `DemoInventoryStore` has been removed.
+- Browse opens by default and presents one current Place with switching and creation, Place-local edit/share actions, useful empty states, and contextual New Room, Storage Area, Container, and Thing controls. Familiar QR and pencil toolbar actions stay explicit instead of collapsing into ellipsis menus.
 - Real AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, and duplicate suppression. Scanned known destinations and unknown tokens are preserved through routing.
 - Camera and Photos picker adapters normalize orientation, strip metadata, cap full images at 2048 px, create 320 px thumbnails, and persist explicit `PhotoAsset` records.
 - The confirmed `iCloud.in.sids.witt` container, iCloud/remote-notification entitlements, private/shared Core Data stores, Place-rooted read/write sharing UI, and invitation acceptance are wired.
 - The one-screen create-and-attach flow can atomically create or select a Room, Storage Area, and Container before binding a scanned QR code.
-- Printable random QR sheets support A4 and US Letter, two label styles, crisp high-contrast codes, Quick Look preview, and the native share/print flow without persisting unbound tokens.
+- Printable random QR sheets support A4, US Letter, and configurable continuous Thermal Roll layouts with metric width, QRs per row, spacing, margins, geometry validation, two label styles, crisp high-contrast codes, Quick Look preview, and the native share/print flow without persisting unbound tokens.
 - Explicit repository and store contracts cover manual create, edit, same-Place move, photo replacement/removal, and cascading archive for Place, Room, Storage Area, Container, and Thing. Native one-screen management forms, context-aware add menus, live detail navigation, archive confirmations, and iPhone/iPad Browse integration are implemented.
 - A Responses-compatible vision adapter validates normalized JPEGs, requests strict structured suggestions with provider storage disabled, maps transport/provider failures, and is injected into both Thing-creation paths. Runtime configuration is environment-only through `WITT_AI_RESPONSES_URL`, `WITT_AI_MODEL`, and `WITT_AI_BEARER_TOKEN`; no provider secret belongs in the app bundle. Debug builds use the deterministic mock only when no AI configuration is present, while unconfigured release builds fail honestly into manual entry.
-- The `wittTests` target has 94 passing simulator tests covering persistence, containment and management mutations, QR routing/scanning/printing, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
+- The `wittTests` target has 102 passing simulator tests covering persistence, containment and management mutations, QR routing/scanning/printing and thermal geometry, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
-Version 1.0 build 1 is available through the `WITT Internal` TestFlight group, and Sid is actively reviewing it on device. Put all review feedback into `WITT: Todo Tracker` before dispatching fixes.
+Version 1.0 build 2 is available through the `WITT Internal` TestFlight group for Sid's next device review. Put all review feedback into `WITT: Todo Tracker` before dispatching fixes.
 
 ## Working Model For Codex Threads
 
