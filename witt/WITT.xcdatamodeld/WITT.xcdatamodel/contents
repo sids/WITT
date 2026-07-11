@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="27000" systemVersion="26A" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="Area" representedClassName="Area" syncable="YES">
+        <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="detail" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="sortOrder" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="containers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Container" inverseName="parentArea" inverseEntity="Container"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="areaOwner" inverseEntity="PhotoAsset"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="areas" inverseEntity="Place"/>
+        <relationship name="primaryPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="primaryForAreas" inverseEntity="PhotoAsset"/>
+        <relationship name="qrCodes" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="QRCode" inverseName="area" inverseEntity="QRCode"/>
+        <relationship name="room" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Room" inverseName="areas" inverseEntity="Room"/>
+        <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeArea" inverseEntity="Thing"/>
+    </entity>
+    <entity name="Container" representedClassName="Container" syncable="YES">
+        <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="detail" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="sortOrder" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="childContainers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Container" inverseName="parentContainer" inverseEntity="Container"/>
+        <relationship name="parentArea" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Area" inverseName="containers" inverseEntity="Area"/>
+        <relationship name="parentContainer" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Container" inverseName="childContainers" inverseEntity="Container"/>
+        <relationship name="parentRoom" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Room" inverseName="containers" inverseEntity="Room"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="containerOwner" inverseEntity="PhotoAsset"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="containers" inverseEntity="Place"/>
+        <relationship name="primaryPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="primaryForContainers" inverseEntity="PhotoAsset"/>
+        <relationship name="qrCodes" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="QRCode" inverseName="container" inverseEntity="QRCode"/>
+        <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeContainer" inverseEntity="Thing"/>
+    </entity>
+    <entity name="PhotoAsset" representedClassName="PhotoAsset" syncable="YES">
+        <attribute name="byteSize" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="capturedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="contentType" attributeType="String" defaultValueString="image/jpeg"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="data" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="kind" attributeType="String" defaultValueString="original"/>
+        <attribute name="pixelHeight" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pixelWidth" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="source" attributeType="String" defaultValueString="camera"/>
+        <attribute name="thumbnailData" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
+        <relationship name="areaOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Area" inverseName="photos" inverseEntity="Area"/>
+        <relationship name="containerOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Container" inverseName="photos" inverseEntity="Container"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="photoAssets" inverseEntity="Place"/>
+        <relationship name="placeOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="photos" inverseEntity="Place"/>
+        <relationship name="primaryForAreas" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Area" inverseName="primaryPhoto" inverseEntity="Area"/>
+        <relationship name="primaryForContainers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Container" inverseName="primaryPhoto" inverseEntity="Container"/>
+        <relationship name="primaryForPlaces" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Place" inverseName="primaryPhoto" inverseEntity="Place"/>
+        <relationship name="primaryForThings" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="primaryPhoto" inverseEntity="Thing"/>
+        <relationship name="thingOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Thing" inverseName="photos" inverseEntity="Thing"/>
+    </entity>
+    <entity name="Place" representedClassName="Place" syncable="YES">
+        <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="areas" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Area" inverseName="place" inverseEntity="Area"/>
+        <relationship name="containers" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Container" inverseName="place" inverseEntity="Container"/>
+        <relationship name="keywords" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ThingKeyword" inverseName="place" inverseEntity="ThingKeyword"/>
+        <relationship name="photoAssets" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PhotoAsset" inverseName="place" inverseEntity="PhotoAsset"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="placeOwner" inverseEntity="PhotoAsset"/>
+        <relationship name="primaryPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="primaryForPlaces" inverseEntity="PhotoAsset"/>
+        <relationship name="qrCodes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="QRCode" inverseName="place" inverseEntity="QRCode"/>
+        <relationship name="rooms" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Room" inverseName="place" inverseEntity="Room"/>
+        <relationship name="things" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Thing" inverseName="place" inverseEntity="Thing"/>
+    </entity>
+    <entity name="QRCode" representedClassName="QRCode" syncable="YES">
+        <attribute name="boundAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lastScannedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="state" attributeType="String" defaultValueString="bound"/>
+        <attribute name="token" attributeType="String" defaultValueString=""/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="area" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Area" inverseName="qrCodes" inverseEntity="Area"/>
+        <relationship name="container" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Container" inverseName="qrCodes" inverseEntity="Container"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="qrCodes" inverseEntity="Place"/>
+    </entity>
+    <entity name="Room" representedClassName="Room" syncable="YES">
+        <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="sortOrder" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="areas" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Area" inverseName="room" inverseEntity="Area"/>
+        <relationship name="containers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Container" inverseName="parentRoom" inverseEntity="Container"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="rooms" inverseEntity="Place"/>
+        <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeRoom" inverseEntity="Thing"/>
+    </entity>
+    <entity name="Thing" representedClassName="Thing" syncable="YES">
+        <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="detail" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="nameSource" attributeType="String" defaultValueString="user"/>
+        <attribute name="searchTextNormalized" optional="YES" attributeType="String"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="homeArea" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Area" inverseName="things" inverseEntity="Area"/>
+        <relationship name="homeContainer" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Container" inverseName="things" inverseEntity="Container"/>
+        <relationship name="homeRoom" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Room" inverseName="things" inverseEntity="Room"/>
+        <relationship name="keywords" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ThingKeyword" inverseName="thing" inverseEntity="ThingKeyword"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="thingOwner" inverseEntity="PhotoAsset"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="things" inverseEntity="Place"/>
+        <relationship name="primaryPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="primaryForThings" inverseEntity="PhotoAsset"/>
+    </entity>
+    <entity name="ThingKeyword" representedClassName="ThingKeyword" syncable="YES">
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="displayValue" attributeType="String" defaultValueString=""/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="normalizedValue" attributeType="String" defaultValueString=""/>
+        <attribute name="source" attributeType="String" defaultValueString="user"/>
+        <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="keywords" inverseEntity="Place"/>
+        <relationship name="thing" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Thing" inverseName="keywords" inverseEntity="Thing"/>
+    </entity>
+</model>

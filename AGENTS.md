@@ -60,14 +60,15 @@ Support iPhone and iPad.
 
 Use Core Data with iCloud sharing for persistence. Sharing should happen at the place level, with complete read/write access for shared participants.
 
-The repo currently contains a minimal Xcode project:
+The repo now contains the first integrated implementation milestone:
 
-```text
-witt.xcodeproj
-witt/ContentView.swift
-```
+- A native SwiftUI app shell for Browse, Search, Scan, known-QR add Thing, unknown-QR attachment, and Thing detail on iPhone and iPad.
+- A CloudKit-compatible Core Data model plus `PersistenceController`, explicit managed object classes, and containment validation.
+- Strict opaque QR token generation/parsing and provider-neutral QR resolution types.
+- A provider-neutral photo-labeling protocol with a deterministic mock implementation.
+- A `wittTests` target covering QR behavior, domain validation, AI helpers, and the in-memory persistence graph.
 
-The current app entry point is still a placeholder "Hello, world!" SwiftUI app. Expect major product, model, navigation, and persistence work ahead.
+The app root initializes the local Core Data stack, but the current reviewable feature UI still uses `DemoInventoryStore`. Camera capture and scanning are simulator-friendly placeholders, and AI labeling uses the injected mock service. Do not mistake these seams for finished production integrations. The next implementation work should replace the demo store with persistence-backed repositories, add real scanner/photo adapters, configure CloudKit entitlements after confirming the container identifier, and run the real-device sharing spike.
 
 ## Working Model For Codex Threads
 
@@ -126,3 +127,4 @@ For unknown QR scans, avoid unnecessary intermediate steps. Open the attach-QR s
 Clarify these with Sid before locking implementation:
 
 1. Validate with a real-device/two-iCloud-account spike that `PhotoAsset` binary data with external storage is shared correctly when a Place is shared.
+2. Confirm the production CloudKit container identifier before adding iCloud entitlements. The current bundle identifier is `in.sids.witt`; `iCloud.in.sids.witt` is the natural candidate but is not yet configured.
