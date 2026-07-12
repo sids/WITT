@@ -31,7 +31,7 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 The baseline is 132 passing `wittTests` simulator tests in both Debug and Release-optimized configurations. Coverage includes persistence, managed-object runtime mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
 
-Version 1.0 build 4 remains in beta testing through the `WITT Internal` TestFlight group, but FB-024 requires replacement because manual Container creation can crash on device. Its source commit is `28433e3`, and its App Store Connect build ID is `54bf071a-76d5-4829-9067-326f003da172`. See [release.md](release.md) for durable release facts and process.
+Version 1.0 build 5 is `IN_BETA_TESTING` through the `WITT Internal` TestFlight group. It replaces build 4 with the Core Data runtime-class fix for FB-024 and the recent Browse layout and navigation polish. Its source commit is `f34fead`, and its App Store Connect build ID is `f7c85715-461d-427b-ab52-72a0aab6aeb7`. The affected iPhone still needs to confirm manual Container creation before FB-024 closes. See [release.md](release.md) for durable release facts and process.
 
 ## Project Documents
 
