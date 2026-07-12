@@ -7,9 +7,9 @@ WITT is at the seventh integrated implementation milestone. The native SwiftUI a
 - Browse, Search, Thing detail, known-QR add-Thing, and unknown-QR attach/create flows use immutable snapshots from `CoreDataCatalogRepository`.
 - Browse opens directly on the selected Place's Rooms screen. A native Place menu switches or creates Places and retains Print QR Labels; Rename and Share remain in the Place ellipsis menu, with a separate Shared management button when a CloudKit share exists.
 - A Mail-style system toolbar provides the Place menu, full-catalog Thing search, and a full-screen QR scanner that closes back to the unchanged Browse position. Compact and regular layouts use the platform's native search placement without custom glass styling.
-- Browse persists its selected Place and deepest destination across launches and reconstructs that screen's current active hierarchy after catalog loading. A moved destination restores through its new parent chain; missing, archived, and cyclic states fall back safely to an active Place root.
-- Browse gives each collection level a distinct presentation: two-column landscape Room tiles, image-led Storage Area rows, two-column Thing photo tiles, and two-column Container photo tiles. Room, Storage Area, and Container counts include every active descendant Thing, with malformed duplicate paths counted only once.
-- Contextual creation controls continue through Rooms, Storage Areas, and Containers. Creation sheets focus their primary name field immediately, and empty list actions use standalone system rows.
+- Browse persists its selected Place and deepest destination across launches and reconstructs that screen's current active hierarchy after catalog loading. A moved destination restores through its new parent chain; missing, archived, and cyclic states fall back safely to an active Place root. Explicit Room taps replace any stale restored path before navigation.
+- Browse gives each collection level a distinct presentation: two-column landscape Room tiles, image-led Storage Area rows, low-margin two-column Thing photo tiles, and low-margin two-column Container photo tiles. Room, Storage Area, and Container counts include every active descendant Thing, with malformed duplicate paths counted only once.
+- Contextual creation controls continue through Rooms, Storage Areas, and Containers. New Room, Thing, and Container actions are dashed tiles inside their grids; New Storage Area is a dashed row matching a Storage Area cell. Creation sheets focus their primary name field immediately.
 - New Storage Area and Container forms can scan and atomically bind an unused WITT QR label. Existing target screens expose Attach/Reattach through ellipsis menus and a shared full-screen scanner; replacement releases the old label but never takes a code attached elsewhere.
 - Storage Area details render as secondary text beneath the title, while QR status stays out of Storage Area and Container content screens.
 - AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, duplicate suppression, known destinations, and unknown tokens.
@@ -28,7 +28,7 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 ## Verification And Distribution
 
-The baseline is 125 passing `wittTests` simulator tests covering persistence, containment and management mutations, selected-Place Browse restoration and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
+The baseline is 128 passing `wittTests` simulator tests covering persistence, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
 
 Version 1.0 build 4 is valid and in beta testing through the `WITT Internal` TestFlight group. Its source commit is `28433e3`, and its App Store Connect build ID is `54bf071a-76d5-4829-9067-326f003da172`. See [release.md](release.md) for durable release facts and process.
 

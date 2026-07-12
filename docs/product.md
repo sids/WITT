@@ -59,7 +59,7 @@ Browse opens by default on the selected Place's Rooms screen; there is no Places
 
 The system bottom toolbar follows the compact Mail pattern: a leading menu for switching or creating Places, system search in the center, and a trailing Scan QR button. The Place menu clearly marks the current Place and also retains access to Print QR Labels. Switching Places returns to that Place's Rooms screen. With no active Place, New Place is the primary path forward.
 
-Browse follows the same hierarchy on iPhone and iPad: selected Place, Room, Storage Area or Container, then Thing. WITT remembers both the selected Place and deepest in-Place destination across launches, restoring the current hierarchy when content has moved. A missing or archived destination returns to the selected Place's Rooms screen; an unavailable selected Place falls back safely to another active Place.
+Browse follows the same hierarchy on iPhone and iPad: selected Place, Room, Storage Area or Container, then Thing. WITT remembers both the selected Place and deepest in-Place destination across launches, restoring the current hierarchy when content has moved. A missing or archived destination returns to the selected Place's Rooms screen; an unavailable selected Place falls back safely to another active Place. A Room selected explicitly from the Place root always replaces any previously restored path and opens that exact Room.
 
 Creation is contextual:
 
@@ -75,9 +75,10 @@ Storage Area details appear as secondary, noninteractive text immediately beneat
 Browse collections should make each hierarchy level recognizable at a glance:
 
 - Rooms use two-column landscape tiles with a left icon, a two-line name, and the total number of descendant Things.
-- Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right.
-- Things use two-column square photo tiles with the name in a restrained translucent bottom overlay.
-- Containers use two-column square photo tiles with centered name and descendant Thing count in a restrained translucent overlay.
+- New Room is a matching dashed tile inside the Room grid; when it is the only tile, it remains one column wide and centered.
+- Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right. New Storage Area is a full-size dashed row matching that list geometry.
+- Things use low-margin two-column square photo tiles with the name in a restrained translucent bottom overlay. New Thing is a matching dashed tile in the grid.
+- Containers use low-margin two-column square photo tiles with centered name and descendant Thing count in a restrained translucent overlay. New Container is a matching dashed tile in the grid.
 
 Counts include active Things nested anywhere beneath the displayed Room, Storage Area, or Container. Missing photos use clear system-image fallbacks. These layouts belong to Browse; Find remains optimized for scanning search results.
 

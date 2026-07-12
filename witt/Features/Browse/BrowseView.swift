@@ -123,6 +123,12 @@ struct BrowseRestoredState: Equatable {
     let visiblePath: [BrowseRoute]
 }
 
+enum BrowsePathTransition {
+    static func selectingRoom(_ roomID: UUID, replacing _: [BrowseRoute]) -> [BrowseRoute] {
+        [.room(roomID)]
+    }
+}
+
 enum BrowseSelectionRestorer {
     static func state(
         for destination: BrowseRoute?,
@@ -182,6 +188,7 @@ struct BrowseView: View {
                             store: store,
                             place: selectedPlace,
                             onSharePlace: onSharePlace,
+                            onSelectRoom: selectRoom,
                             presentManagement: presentManagement
                         )
                     } else {
@@ -386,6 +393,12 @@ struct BrowseView: View {
         selectPlace(placeID)
     }
 
+    private func selectRoom(_ roomID: UUID) {
+        withAnimation {
+            path = BrowsePathTransition.selectingRoom(roomID, replacing: path)
+        }
+    }
+
     private func navigateToSearchResult(_ thing: ThingSnapshot) {
         let restored = BrowseSelectionRestorer.state(for: .thing(thing.id), in: store.activePlaces)
         isSearchPresented = false
@@ -414,6 +427,7 @@ private struct PlaceListView: View {
     @ObservedObject var store: CatalogStore
     let place: PlaceSnapshot
     let onSharePlace: (UUID) -> Void
+    let onSelectRoom: (UUID) -> Void
     let presentManagement: (ManagementRoute) -> Void
 
     var body: some View {
@@ -429,18 +443,29 @@ private struct PlaceListView: View {
                     )
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
-                }
 
-                Section {
-                    Button("New Room", systemImage: "plus") {
-                        presentManagement(.createRoom(placeID: place.id))
+                    GeometryReader { proxy in
+                        HStack {
+                            Spacer(minLength: 0)
+                            newRoomButton(placeID: place.id)
+                                .frame(width: (proxy.size.width - 12) / 2)
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .frame(height: 92)
+                    .listRowInsets(
+                        EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0)
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             } else {
                 Section("Rooms") {
                     TwoColumnBrowseGrid {
                         ForEach(place.activeRooms) { room in
-                            NavigationLink(value: BrowseRoute.room(room.id)) {
+                            Button {
+                                onSelectRoom(room.id)
+                            } label: {
                                 RoomTile(
                                     room: room,
                                     thingCount: place.descendantThingCount(inRoom: room.id)
@@ -448,16 +473,12 @@ private struct PlaceListView: View {
                             }
                             .buttonStyle(.plain)
                         }
+
+                        newRoomButton(placeID: place.id)
                     }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                }
-
-                Section {
-                    Button("New Room", systemImage: "plus") {
-                        presentManagement(.createRoom(placeID: place.id))
-                    }
                 }
             }
         }
@@ -482,6 +503,15 @@ private struct PlaceListView: View {
                 .labelStyle(.iconOnly)
             }
         }
+    }
+
+    private func newRoomButton(placeID: UUID) -> some View {
+        Button {
+            presentManagement(.createRoom(placeID: placeID))
+        } label: {
+            NewRoomTile()
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -563,22 +593,27 @@ struct RoomDetailView: View {
                             .browseGridListRow()
                         }
                     }
-                    if !areas.isEmpty {
-                        Section("Storage Areas") {
-                            ForEach(areas) { area in
-                                NavigationLink(value: BrowseRoute.area(area.id)) {
-                                    StorageAreaRow(
-                                        area: area,
-                                        thingCount: place.descendantThingCount(inArea: area.id)
-                                    )
-                                }
+                    Section("Storage Areas") {
+                        ForEach(areas) { area in
+                            NavigationLink(value: BrowseRoute.area(area.id)) {
+                                StorageAreaRow(
+                                    area: area,
+                                    thingCount: place.descendantThingCount(inArea: area.id)
+                                )
                             }
                         }
-                    }
-                    Section {
-                        Button("New Storage Area", systemImage: "plus") {
+
+                        Button {
                             presentManagement(.createArea(roomID: room.id))
+                        } label: {
+                            NewStorageAreaRow()
                         }
+                        .buttonStyle(.plain)
+                        .listRowInsets(
+                            EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
                 }
                 .navigationTitle(room.name)
@@ -621,51 +656,46 @@ private struct AreaDetailView: View {
                         CatalogLocationSummary(photo: area.primaryPhoto, detail: nil)
                         let things = place.activeThings(in: .area(area.id))
                         let containers = place.activeContainers(inArea: area.id)
-                        if things.isEmpty && containers.isEmpty {
-                            Section("Contents") {
-                                Text("Empty").foregroundStyle(.secondary)
-                            }
-                        }
-                        if !things.isEmpty {
-                            Section("Things") {
-                                TwoColumnBrowseGrid {
-                                    ForEach(things) { thing in
-                                        NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                            ThingMediaTile(thing: thing)
-                                        }
-                                        .buttonStyle(.plain)
+                        Section("Things") {
+                            TwoColumnBrowseGrid {
+                                ForEach(things) { thing in
+                                    NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                        ThingMediaTile(thing: thing)
                                     }
+                                    .buttonStyle(.plain)
                                 }
-                                .browseGridListRow()
-                            }
-                        }
-                        if !containers.isEmpty {
-                            Section("Containers") {
-                                TwoColumnBrowseGrid {
-                                    ForEach(containers) { container in
-                                        NavigationLink(value: BrowseRoute.container(container.id)) {
-                                            ContainerMediaTile(
-                                                container: container,
-                                                thingCount: place.descendantThingCount(
-                                                    inContainer: container.id
-                                                )
-                                            )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .browseGridListRow()
-                            }
-                        }
-                        Section {
-                            Menu("New", systemImage: "plus") {
-                                Button("Container", systemImage: "shippingbox") {
-                                    presentManagement(.createContainer(destination: .area(area.id)))
-                                }
-                                Button("Thing", systemImage: "square.grid.2x2") {
+
+                                Button {
                                     presentManagement(.createThing(destination: .area(area.id)))
+                                } label: {
+                                    NewCatalogGridTile(title: "New Thing")
                                 }
+                                .buttonStyle(.plain)
                             }
+                            .browseGridListRow()
+                        }
+                        Section("Containers") {
+                            TwoColumnBrowseGrid {
+                                ForEach(containers) { container in
+                                    NavigationLink(value: BrowseRoute.container(container.id)) {
+                                        ContainerMediaTile(
+                                            container: container,
+                                            thingCount: place.descendantThingCount(
+                                                inContainer: container.id
+                                            )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                Button {
+                                    presentManagement(.createContainer(destination: .area(area.id)))
+                                } label: {
+                                    NewCatalogGridTile(title: "New Container")
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .browseGridListRow()
                         }
                     }
                 }
@@ -723,51 +753,46 @@ private struct ContainerDetailView: View {
                     )
                     let things = place.activeThings(in: .container(container.id))
                     let children = place.childContainers(of: container.id)
-                    if things.isEmpty && children.isEmpty {
-                        Section("Contents") {
-                            Text("Empty").foregroundStyle(.secondary)
-                        }
-                    }
-                    if !things.isEmpty {
-                        Section("Things") {
-                            TwoColumnBrowseGrid {
-                                ForEach(things) { thing in
-                                    NavigationLink(value: BrowseRoute.thing(thing.id)) {
-                                        ThingMediaTile(thing: thing)
-                                    }
-                                    .buttonStyle(.plain)
+                    Section("Things") {
+                        TwoColumnBrowseGrid {
+                            ForEach(things) { thing in
+                                NavigationLink(value: BrowseRoute.thing(thing.id)) {
+                                    ThingMediaTile(thing: thing)
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .browseGridListRow()
-                        }
-                    }
-                    if !children.isEmpty {
-                        Section("Containers") {
-                            TwoColumnBrowseGrid {
-                                ForEach(children) { child in
-                                    NavigationLink(value: BrowseRoute.container(child.id)) {
-                                        ContainerMediaTile(
-                                            container: child,
-                                            thingCount: place.descendantThingCount(
-                                                inContainer: child.id
-                                            )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .browseGridListRow()
-                        }
-                    }
-                    Section {
-                        Menu("New", systemImage: "plus") {
-                            Button("Container", systemImage: "shippingbox") {
-                                presentManagement(.createContainer(destination: .container(container.id)))
-                            }
-                            Button("Thing", systemImage: "square.grid.2x2") {
+
+                            Button {
                                 presentManagement(.createThing(destination: .container(container.id)))
+                            } label: {
+                                NewCatalogGridTile(title: "New Thing")
                             }
+                            .buttonStyle(.plain)
                         }
+                        .browseGridListRow()
+                    }
+                    Section("Containers") {
+                        TwoColumnBrowseGrid {
+                            ForEach(children) { child in
+                                NavigationLink(value: BrowseRoute.container(child.id)) {
+                                    ContainerMediaTile(
+                                        container: child,
+                                        thingCount: place.descendantThingCount(
+                                            inContainer: child.id
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Button {
+                                presentManagement(.createContainer(destination: .container(container.id)))
+                            } label: {
+                                NewCatalogGridTile(title: "New Container")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .browseGridListRow()
                     }
                 }
                 .navigationTitle(container.name)
@@ -846,7 +871,7 @@ private struct TwoColumnBrowseGrid<Content: View>: View {
 private struct BrowseGridListRowModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
     }
@@ -889,6 +914,25 @@ private struct RoomTile: View {
     }
 }
 
+private struct NewRoomTile: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "plus")
+                .font(.title2)
+                .frame(width: 30)
+                .accessibilityHidden(true)
+            Text("New Room")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(.tint)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .overlay { DashedCreateBorder() }
+        .contentShape(.rect)
+    }
+}
+
 private struct StorageAreaRow: View {
     let area: AreaSnapshot
     let thingCount: Int
@@ -907,6 +951,58 @@ private struct StorageAreaRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             CatalogThumbnail(photo: area.primaryPhoto, fallbackSystemImage: "cabinet")
         }
+    }
+}
+
+private struct NewStorageAreaRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.title2)
+                .frame(width: 30)
+                .accessibilityHidden(true)
+            Text("New Storage Area")
+                .font(.headline)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.tint)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+        .overlay { DashedCreateBorder() }
+        .contentShape(.rect)
+    }
+}
+
+private struct DashedCreateBorder: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .stroke(
+                Color.secondary.opacity(0.55),
+                style: StrokeStyle(lineWidth: 1, dash: [6, 4])
+            )
+            .accessibilityHidden(true)
+    }
+}
+
+private struct NewCatalogGridTile: View {
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "plus")
+                .font(.title2)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .foregroundStyle(.tint)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .overlay { DashedCreateBorder() }
+        .contentShape(.rect)
     }
 }
 

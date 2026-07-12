@@ -1,6 +1,6 @@
 # WITT Todo
 
-Updated July 11, 2026.
+Updated July 12, 2026.
 
 This is the canonical source of truth for actionable WITT work. New TestFlight feedback lands in the inbox before implementation starts.
 
@@ -22,6 +22,10 @@ Workflow:
 ## Feedback Inbox
 
 - [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (4)`. Close when Sid considers the review pass complete.
+- [x] FB-018 - Sid, July 12, 2026, build `1.0 (4)`: Tighten the Room grid's horizontal margins so its tiles extend as far as the current New Room action. Make New Room a tile inside the two-column grid with a restrained dashed border. In the empty state, use the same dashed New Room tile but keep it centered rather than stretching it across the screen. Verified populated and empty states on iPhone; the adaptive two-column structure is unchanged on iPad.
+- [x] FB-019 - Sid, July 12, 2026, build `1.0 (4)`: Fix Room navigation selecting a stale saved destination. Explicit Room taps now atomically replace a restored path, while launch restoration remains intact. Verified by three regression tests and by restoring a deep Garage path, backing to Home, selecting Home Office, and returning to Home.
+- [x] FB-020 - Sid, July 12, 2026, build `1.0 (4)`: Make New Storage Area a full Storage Area list-sized action row with a restrained dashed border, in both empty and populated Room states. Verified on populated Garage and empty Home Office screens.
+- [x] FB-021 - Sid, July 12, 2026, build `1.0 (4)`: Tighten the horizontal margins for Thing and Container grids. Put New Thing and New Container inside their corresponding two-column grids as square dashed-border tiles instead of a separate New menu, while preserving the same creation destinations. Verified on populated and empty Storage Area and Container states.
 
 ## P0 - Release Gates
 
