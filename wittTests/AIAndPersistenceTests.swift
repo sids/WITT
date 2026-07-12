@@ -59,13 +59,128 @@ final class PersistenceControllerTests: XCTestCase {
         )
     }
 
+    func testManagedObjectClassesUsePrefixedRuntimeNamesWithoutChangingSchemaHashes() throws {
+        let model = PersistenceController.inMemory().container.managedObjectModel
+        let expected: [(
+            entityName: String,
+            className: String,
+            type: NSManagedObject.Type,
+            versionHash: String
+        )] = [
+            ("Area", "WITTArea", Area.self, "LYYQa3diYpuLlNbEPq6XW+Uej7SdJXkWE5eoWwZeRjc="),
+            ("Container", "WITTContainer", Container.self, "1E7xYw/C+3Mkr/fs9n0Gimk1/JRZ0yXGYzANNsHOBe4="),
+            ("PhotoAsset", "WITTPhotoAsset", PhotoAsset.self, "/WzL6Dakbp64ujT5ucGzvqxREf8wVWy84ttr6bLplvk="),
+            ("Place", "WITTPlace", Place.self, "O5xjFqMU+unS3RBZqJOHDAG+nqIRbvkvdLNkzTVojFE="),
+            ("QRCode", "WITTQRCode", QRCode.self, "PsHTsVyJ13WZWNScd+NjIDItyHwm7AxMZSWE6oljh3Q="),
+            ("Room", "WITTRoom", Room.self, "2bwz1XgxiMnfw01wOMZ4ATYHxQQHFbypw3pw/mgZ9z8="),
+            ("Thing", "WITTThing", Thing.self, "4lH/y3r7dh0HFUdZm0mQ52mp/2La4hdwYEN1cCDMZ0c="),
+            ("ThingKeyword", "WITTThingKeyword", ThingKeyword.self, "fKvr5mFyUCHl0N5LhwoA2P9PEK14fCnh7ReQtZEPrUg=")
+        ]
+
+        for item in expected {
+            let entity = try XCTUnwrap(model.entitiesByName[item.entityName])
+            XCTAssertEqual(entity.managedObjectClassName, item.className)
+            XCTAssertEqual(NSStringFromClass(item.type), item.className)
+            XCTAssertTrue(NSClassFromString(item.className) === item.type)
+            XCTAssertEqual(entity.versionHash.base64EncodedString(), item.versionHash)
+        }
+    }
+
+    func testProductionInsertionHelperCreatesEveryManagedObjectClass() throws {
+        let context = PersistenceController.inMemory().viewContext
+        let place: Place = try CoreDataCatalogRepository.insert("Place", into: context)
+        let room: Room = try CoreDataCatalogRepository.insert("Room", into: context)
+        let area: Area = try CoreDataCatalogRepository.insert("Area", into: context)
+        let container: Container = try CoreDataCatalogRepository.insert("Container", into: context)
+        let thing: Thing = try CoreDataCatalogRepository.insert("Thing", into: context)
+        let keyword: ThingKeyword = try CoreDataCatalogRepository.insert("ThingKeyword", into: context)
+        let qrCode: QRCode = try CoreDataCatalogRepository.insert("QRCode", into: context)
+        let photo: PhotoAsset = try CoreDataCatalogRepository.insert("PhotoAsset", into: context)
+
+        XCTAssertTrue(Swift.type(of: place) == Place.self)
+        XCTAssertTrue(Swift.type(of: room) == Room.self)
+        XCTAssertTrue(Swift.type(of: area) == Area.self)
+        XCTAssertTrue(Swift.type(of: container) == Container.self)
+        XCTAssertTrue(Swift.type(of: thing) == Thing.self)
+        XCTAssertTrue(Swift.type(of: keyword) == ThingKeyword.self)
+        XCTAssertTrue(Swift.type(of: qrCode) == QRCode.self)
+        XCTAssertTrue(Swift.type(of: photo) == PhotoAsset.self)
+    }
+
+    func testProductionInsertionHelperRejectsClassMismatchWithoutCoreDataLookup() throws {
+        let sourceModel = PersistenceController.inMemory().container.managedObjectModel
+        let model = try XCTUnwrap(sourceModel.copy() as? NSManagedObjectModel)
+        let containerEntity = try XCTUnwrap(model.entitiesByName["Container"])
+        containerEntity.managedObjectClassName = NSStringFromClass(NSObject.self)
+
+        let persistentContainer = NSPersistentContainer(
+            name: "WITT-Mismatch",
+            managedObjectModel: model
+        )
+        let description = NSPersistentStoreDescription(
+            url: URL(fileURLWithPath: "/dev/null")
+        )
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        persistentContainer.persistentStoreDescriptions = [description]
+        var loadError: Error?
+        persistentContainer.loadPersistentStores { _, error in loadError = error }
+        XCTAssertNil(loadError)
+
+        XCTAssertThrowsError(
+            try CoreDataCatalogRepository.insert(
+                "Container",
+                into: persistentContainer.viewContext
+            ) as Container
+        ) { error in
+            XCTAssertEqual(error as? CatalogRepositoryError, .invalidManagedObjectModel)
+        }
+    }
+
+    func testSQLiteStoreReopensAndFetchesCreatedContainer() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("witt-class-resolution-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+
+        do {
+            let persistence = PersistenceController(
+                cloudKitContainerIdentifier: nil,
+                storeDirectory: directory
+            )
+            let repository = CoreDataCatalogRepository(persistenceController: persistence)
+            let place = try await repository.createPlace(.init(name: "Home"))
+            let room = try await repository.createRoom(.init(placeID: place.id, name: "Garage"))
+            _ = try await repository.createContainer(.init(
+                name: "Tool Chest",
+                destination: .room(room.id)
+            ))
+        }
+
+        do {
+            let persistence = PersistenceController(
+                cloudKitContainerIdentifier: nil,
+                storeDirectory: directory
+            )
+            let repository = CoreDataCatalogRepository(persistenceController: persistence)
+            let places = try await repository.fetchPlaces()
+
+            XCTAssertEqual(places.count, 1)
+            XCTAssertEqual(places[0].containers.map(\.name), ["Tool Chest"])
+        }
+
+        try FileManager.default.removeItem(at: directory)
+    }
+
     func testMinimalGraphPassesManagedObjectValidation() throws {
         let context = PersistenceController.inMemory().viewContext
-        let place: Place = insert("Place", into: context)
-        let room: Room = insert("Room", into: context)
-        let area: Area = insert("Area", into: context)
-        let container: Container = insert("Container", into: context)
-        let thing: Thing = insert("Thing", into: context)
+        let place: Place = try CoreDataCatalogRepository.insert("Place", into: context)
+        let room: Room = try CoreDataCatalogRepository.insert("Room", into: context)
+        let area: Area = try CoreDataCatalogRepository.insert("Area", into: context)
+        let container: Container = try CoreDataCatalogRepository.insert("Container", into: context)
+        let thing: Thing = try CoreDataCatalogRepository.insert("Thing", into: context)
 
         place.name = "Home"
         room.name = "Office"
@@ -86,12 +201,5 @@ final class PersistenceControllerTests: XCTestCase {
         XCTAssertNoThrow(try ManagedObjectDomainValidator.validate(container))
         XCTAssertNoThrow(try ManagedObjectDomainValidator.validate(thing))
         XCTAssertNoThrow(try context.obtainPermanentIDs(for: [place, room, area, container, thing]))
-    }
-
-    private func insert<T: NSManagedObject>(
-        _ entityName: String,
-        into context: NSManagedObjectContext
-    ) -> T {
-        NSEntityDescription.insertNewObject(forEntityName: entityName, into: context) as! T
     }
 }

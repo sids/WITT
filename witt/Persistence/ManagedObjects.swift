@@ -1,7 +1,7 @@
 import CoreData
 import Foundation
 
-@objc(Place)
+@objc(WITTPlace)
 public final class Place: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String
@@ -25,7 +25,7 @@ public final class Place: NSManagedObject {
     }
 }
 
-@objc(Room)
+@objc(WITTRoom)
 public final class Room: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String
@@ -44,7 +44,7 @@ public final class Room: NSManagedObject {
     }
 }
 
-@objc(Area)
+@objc(WITTArea)
 public final class Area: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String
@@ -67,7 +67,7 @@ public final class Area: NSManagedObject {
     }
 }
 
-@objc(Container)
+@objc(WITTContainer)
 public final class Container: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String
@@ -92,7 +92,7 @@ public final class Container: NSManagedObject {
     }
 }
 
-@objc(Thing)
+@objc(WITTThing)
 public final class Thing: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String
@@ -116,7 +116,7 @@ public final class Thing: NSManagedObject {
     }
 }
 
-@objc(ThingKeyword)
+@objc(WITTThingKeyword)
 public final class ThingKeyword: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var displayValue: String
@@ -133,7 +133,7 @@ public final class ThingKeyword: NSManagedObject {
     }
 }
 
-@objc(QRCode)
+@objc(WITTQRCode)
 public final class QRCode: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var token: String
@@ -152,7 +152,7 @@ public final class QRCode: NSManagedObject {
     }
 }
 
-@objc(PhotoAsset)
+@objc(WITTPhotoAsset)
 public final class PhotoAsset: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var data: Data?

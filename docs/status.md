@@ -18,6 +18,7 @@ WITT is at the seventh integrated implementation milestone. The native SwiftUI a
 - Unknown QR codes can be attached in one flow while selecting or creating a Room, Storage Area, and optional Container.
 - Printable random QR sheets support A4, US Letter, and configurable thermal rolls, with validated geometry, labels, preview, share, and print.
 - Place, Room, Storage Area, Container, and Thing support create, edit, same-Place move, photo replacement/removal, and cascading archive through explicit repository contracts and native management forms.
+- Every managed-object class now has a WITT-prefixed Objective-C runtime name, while entity and Swift names remain unchanged. Repository insertion validates the model-to-type mapping before direct construction, preventing the device-only global `Container` class collision that crashed TestFlight build 4. Entity version hashes remain identical to build 4, and a real SQLite Container graph opens after recreation.
 - A provider-isolated, Responses-compatible vision adapter supplies structured Thing labels and keywords in both Thing-creation paths.
 
 ## Production Boundaries
@@ -28,9 +29,9 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 ## Verification And Distribution
 
-The baseline is 128 passing `wittTests` simulator tests covering persistence, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
+The baseline is 132 passing `wittTests` simulator tests in both Debug and Release-optimized configurations. Coverage includes persistence, managed-object runtime mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing, scanning and printing, thermal geometry, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
 
-Version 1.0 build 4 is valid and in beta testing through the `WITT Internal` TestFlight group. Its source commit is `28433e3`, and its App Store Connect build ID is `54bf071a-76d5-4829-9067-326f003da172`. See [release.md](release.md) for durable release facts and process.
+Version 1.0 build 4 remains in beta testing through the `WITT Internal` TestFlight group, but FB-024 requires replacement because manual Container creation can crash on device. Its source commit is `28433e3`, and its App Store Connect build ID is `54bf071a-76d5-4829-9067-326f003da172`. See [release.md](release.md) for durable release facts and process.
 
 ## Project Documents
 

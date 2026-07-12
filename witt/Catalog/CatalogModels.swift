@@ -346,6 +346,7 @@ public enum CatalogRepositoryError: Error, Equatable, Sendable {
     case thingNotFound
     case crossPlaceMove
     case containerCycle
+    case invalidManagedObjectModel
 }
 
 extension CatalogRepositoryError: LocalizedError {
@@ -383,6 +384,8 @@ extension CatalogRepositoryError: LocalizedError {
             "Storage Areas, Containers, and Things can only be moved within the same Place."
         case .containerCycle:
             "A Container cannot be placed inside itself or one of its descendants."
+        case .invalidManagedObjectModel:
+            "WITT's catalog configuration is invalid. Update the app and try again."
         }
     }
 }

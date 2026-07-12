@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="27000" systemVersion="26A" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
-    <entity name="Area" representedClassName="Area" syncable="YES">
+    <entity name="Area" representedClassName="WITTArea" syncable="YES">
         <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="detail" optional="YES" attributeType="String"/>
@@ -16,7 +16,7 @@
         <relationship name="room" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Room" inverseName="areas" inverseEntity="Room"/>
         <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeArea" inverseEntity="Thing"/>
     </entity>
-    <entity name="Container" representedClassName="Container" syncable="YES">
+    <entity name="Container" representedClassName="WITTContainer" syncable="YES">
         <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="detail" optional="YES" attributeType="String"/>
@@ -34,7 +34,7 @@
         <relationship name="qrCodes" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="QRCode" inverseName="container" inverseEntity="QRCode"/>
         <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeContainer" inverseEntity="Thing"/>
     </entity>
-    <entity name="PhotoAsset" representedClassName="PhotoAsset" syncable="YES">
+    <entity name="PhotoAsset" representedClassName="WITTPhotoAsset" syncable="YES">
         <attribute name="byteSize" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="capturedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="contentType" attributeType="String" defaultValueString="image/jpeg"/>
@@ -56,7 +56,7 @@
         <relationship name="primaryForThings" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="primaryPhoto" inverseEntity="Thing"/>
         <relationship name="thingOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Thing" inverseName="photos" inverseEntity="Thing"/>
     </entity>
-    <entity name="Place" representedClassName="Place" syncable="YES">
+    <entity name="Place" representedClassName="WITTPlace" syncable="YES">
         <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
@@ -73,7 +73,7 @@
         <relationship name="rooms" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Room" inverseName="place" inverseEntity="Room"/>
         <relationship name="things" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Thing" inverseName="place" inverseEntity="Thing"/>
     </entity>
-    <entity name="QRCode" representedClassName="QRCode" syncable="YES">
+    <entity name="QRCode" representedClassName="WITTQRCode" syncable="YES">
         <attribute name="boundAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
@@ -85,7 +85,7 @@
         <relationship name="container" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Container" inverseName="qrCodes" inverseEntity="Container"/>
         <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="qrCodes" inverseEntity="Place"/>
     </entity>
-    <entity name="Room" representedClassName="Room" syncable="YES">
+    <entity name="Room" representedClassName="WITTRoom" syncable="YES">
         <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
@@ -97,7 +97,7 @@
         <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="rooms" inverseEntity="Place"/>
         <relationship name="things" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Thing" inverseName="homeRoom" inverseEntity="Thing"/>
     </entity>
-    <entity name="Thing" representedClassName="Thing" syncable="YES">
+    <entity name="Thing" representedClassName="WITTThing" syncable="YES">
         <attribute name="archivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="detail" optional="YES" attributeType="String"/>
@@ -114,7 +114,7 @@
         <relationship name="place" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Place" inverseName="things" inverseEntity="Place"/>
         <relationship name="primaryPhoto" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PhotoAsset" inverseName="primaryForThings" inverseEntity="PhotoAsset"/>
     </entity>
-    <entity name="ThingKeyword" representedClassName="ThingKeyword" syncable="YES">
+    <entity name="ThingKeyword" representedClassName="WITTThingKeyword" syncable="YES">
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="displayValue" attributeType="String" defaultValueString=""/>
         <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>

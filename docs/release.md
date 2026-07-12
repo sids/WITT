@@ -14,7 +14,7 @@ This page records durable distribution facts and the repeatable release process.
 | Current TestFlight build | 1.0 (4) |
 | Source commit | `28433e3` |
 | App Store Connect build ID | `54bf071a-76d5-4829-9067-326f003da172` |
-| Build state | Valid; in beta testing |
+| Build state | Build 4 in beta testing; replacement required for FB-024 |
 | Xcode / SDK | Xcode 27.0 (`27A5218g`) / iOS 27.0 |
 | Minimum OS | iOS 26 |
 | Non-exempt encryption | No |
@@ -40,6 +40,17 @@ This page records durable distribution facts and the repeatable release process.
 
 1. **Choose the version and build number.** Keep `MARKETING_VERSION` at the intended release version and increment `CURRENT_PROJECT_VERSION` to a value not already uploaded. Confirm both Debug and Release settings for the app target agree.
 2. **Verify the source.** Record the full source commit, ensure the intended changes are committed, run the complete `wittTests` suite, and perform the current device checks from [todo.md](todo.md).
+
+   Before a TestFlight upload, also run the suite with Release optimization and testability enabled so whole-module optimization exercises the production code path:
+
+   ```sh
+   xcodebuild -project witt.xcodeproj \
+     -scheme witt \
+     -configuration Release \
+     -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.0' \
+     ENABLE_TESTABILITY=YES \
+     test
+   ```
 3. **Select Xcode.** Use the Xcode version required for the iOS 26 SDK. If that is an Xcode beta, App Store Connect acceptance can vary during the beta cycle; confirm uploads from that build are currently accepted before treating the archive as releasable.
 4. **Archive.** In Xcode, select a generic iOS device and use Product > Archive, or run:
 

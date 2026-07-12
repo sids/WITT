@@ -38,9 +38,9 @@ These rules are represented without managed objects in [`ContainmentValidation.s
 
 The Core Data schema in [`WITT.xcdatamodel`](../witt/WITT.xcdatamodeld/WITT.xcdatamodel/contents) contains `Place`, `Room`, `Area`, `Container`, `Thing`, `ThingKeyword`, `QRCode`, and `PhotoAsset`. Every entity is CloudKit-syncable. Place has cascade relationships to the complete Place-owned graph; redundant direct `place` relationships on descendants make ownership and store placement explicit even when containment is nested.
 
-[`ManagedObjects.swift`](../witt/Persistence/ManagedObjects.swift) contains the `NSManagedObject` subclasses and insertion-time identities/timestamps. Managed objects do not cross into the SwiftUI presentation layer. [`CatalogModels.swift`](../witt/Catalog/CatalogModels.swift) defines immutable, `Sendable` snapshots, destination enums, mutation drafts, repository errors, and the `CatalogRepository` protocol.
+[`ManagedObjects.swift`](../witt/Persistence/ManagedObjects.swift) contains the `NSManagedObject` subclasses and insertion-time identities/timestamps. Their Objective-C runtime names use the `WITT` prefix even though their Swift and entity names remain domain-native; this prevents global runtime collisions such as the device-only `Container` collision found in TestFlight build 4. Managed objects do not cross into the SwiftUI presentation layer. [`CatalogModels.swift`](../witt/Catalog/CatalogModels.swift) defines immutable, `Sendable` snapshots, destination enums, mutation drafts, repository errors, and the `CatalogRepository` protocol.
 
-[`CoreDataCatalogRepository`](../witt/Catalog/CoreDataCatalogRepository.swift) is the persistence implementation. It owns a background context with transaction author `witt.catalog`; each operation resets that context, fetches the required active graph, validates the mutation, saves atomically, and returns snapshots. Its contract covers catalog reads, initial Home seeding, create/edit, same-Place moves, photo replacement/removal, cascading archive, Thing saving, QR target listing and binding, atomic target creation plus binding, and QR resolution.
+[`CoreDataCatalogRepository`](../witt/Catalog/CoreDataCatalogRepository.swift) is the persistence implementation. It owns a background context with transaction author `witt.catalog`; each operation resets that context, fetches the required active graph, validates the mutation, saves atomically, and returns snapshots. Managed-object insertion resolves the entity explicitly, verifies its configured runtime class against the requested type, and constructs that type directly; a model contract error is reported normally instead of relying on Core Data class lookup and a forced cast. Its contract covers catalog reads, initial Home seeding, create/edit, same-Place moves, photo replacement/removal, cascading archive, Thing saving, QR target listing and binding, atomic target creation plus binding, and QR resolution.
 
 New Places are assigned to the private store when CloudKit is active. Descendants, keywords, QR codes, and photos are explicitly assigned to the persistent store containing their Place. This avoids cross-store relationships and ensures edits to a shared Place stay in the shared store. The in-memory configuration uses one local store for tests and previews.
 
@@ -115,10 +115,11 @@ Creation and editing are routed through `ManagementRoute` and one-screen forms i
 
 ## Testing seams and baseline
 
-The `wittTests` target currently contains 125 simulator tests. The baseline covers:
+The `wittTests` target currently contains 132 simulator tests. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, and QR mutations;
+- managed-object runtime class mappings, build-4 schema hashes, controlled model-contract failures, and SQLite Container reopen compatibility;
 - QR token/URL parsing, resolution, routing, duplicate scanner payloads, and scanner state transitions;
 - sheet and Thermal Roll geometry, pagination, PDF dimensions, quiet zones, crisp rendering, and failure paths;
 - photo orientation, resizing, metadata stripping, thumbnail generation, and persistence;
@@ -136,6 +137,6 @@ The implemented app shell, repository, photo pipeline, scanner, QR printing, sha
 3. Put AI behind a WITT-owned relay or another short-lived credential mechanism. Never ship a long-lived provider API key in the app bundle. Select the production model, endpoint policy, retention/privacy disclosures, failure budget, and user-facing consent posture before enabling live labeling.
 4. Verify CloudKit production schema deployment, container/environment entitlements, push delivery, migration behavior, and App Store/TestFlight signing. The checked-in entitlement currently names the development push environment; release signing must resolve the production entitlement correctly.
 5. Run device coverage for camera permission transitions, QR focus/rotation/torch behavior, deep-link launch from a cold app, photo capture memory pressure, iPad presentation, physical A4/Letter printing, and representative thermal printers.
-6. Preserve the 125-test baseline and add focused regression coverage for any release-gate fixes. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
+6. Preserve the 132-test baseline and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
 
 These gates are validation and production-operations work, not a request to reopen settled domain boundaries. Place-rooted ownership, explicit Area/Container QR binding, provider-neutral AI, normalized photo inputs, and snapshot-based presentation remain the architectural constraints.

@@ -29,7 +29,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
             guard try context.count(for: request) == 0 else { return nil }
 
             do {
-                let place: Place = Self.insert("Place", into: context)
+                let place: Place = try Self.insert("Place", into: context)
                 place.name = "Home"
 
                 let inserted = Array(context.insertedObjects)
@@ -55,7 +55,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         return try await context.perform { [context, self] in
             context.reset()
             do {
-                let place: Place = Self.insert("Place", into: context)
+                let place: Place = try Self.insert("Place", into: context)
                 place.name = try Self.requiredName(draft.name)
                 place.notes = Self.nilIfEmpty(draft.notes)
                 if let photo = draft.photo {
@@ -86,7 +86,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 let place: Place = try Self.fetchActive(
                     id: draft.placeID, entityName: "Place", in: context, notFound: .placeNotFound
                 )
-                let room: Room = Self.insert("Room", into: context)
+                let room: Room = try Self.insert("Room", into: context)
                 room.name = try Self.requiredName(draft.name)
                 room.sortOrder = Self.nextSortOrder(
                     in: Self.managedObjects(place.rooms, as: Room.self).map(\.sortOrder)
@@ -120,7 +120,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                         throw CatalogRepositoryError.tokenAlreadyBound
                     }
                 }
-                let area: Area = Self.insert("Area", into: context)
+                let area: Area = try Self.insert("Area", into: context)
                 area.name = try Self.requiredName(draft.name)
                 area.detail = Self.nilIfEmpty(draft.detail)
                 area.sortOrder = Self.nextSortOrder(
@@ -166,7 +166,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                         throw CatalogRepositoryError.tokenAlreadyBound
                     }
                 }
-                let container: Container = Self.insert("Container", into: context)
+                let container: Container = try Self.insert("Container", into: context)
                 container.name = try Self.requiredName(draft.name)
                 container.detail = Self.nilIfEmpty(draft.detail)
                 container.sortOrder = Self.nextSortOrder(in: parent.childSortOrders)
@@ -339,7 +339,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                     context.delete(keyword)
                 }
                 for displayValue in keywords {
-                    let keyword: ThingKeyword = Self.insert("ThingKeyword", into: context)
+                    let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
                     keyword.displayValue = displayValue
                     keyword.normalizedValue = Self.searchNormalized(displayValue)
                     keyword.source = thing.nameSource
@@ -481,7 +481,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 }
 
                 let home = try Self.fetchHome(destination, in: context)
-                let thing: Thing = Self.insert("Thing", into: context)
+                let thing: Thing = try Self.insert("Thing", into: context)
                 thing.name = normalizedName
                 thing.detail = Self.nilIfEmpty(draft.notes)
                 thing.nameSource = normalizedSource
@@ -490,7 +490,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
 
                 let normalizedKeywords = Self.normalizeKeywords(draft.keywords)
                 for displayValue in normalizedKeywords {
-                    let keyword: ThingKeyword = Self.insert("ThingKeyword", into: context)
+                    let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
                     keyword.displayValue = displayValue
                     keyword.normalizedValue = Self.searchNormalized(displayValue)
                     keyword.source = normalizedSource
@@ -512,7 +512,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                     else {
                         throw CatalogRepositoryError.invalidDraft
                     }
-                    let photo: PhotoAsset = Self.insert("PhotoAsset", into: context)
+                    let photo: PhotoAsset = try Self.insert("PhotoAsset", into: context)
                     photo.data = photoDraft.jpegData
                     photo.thumbnailData = photoDraft.thumbnailJPEGData
                     photo.contentType = photoDraft.contentType
@@ -734,6 +734,28 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         guard persistenceController.isLoaded, persistenceController.loadError == nil else {
             throw CatalogRepositoryError.persistenceNotLoaded
         }
+    }
+}
+
+extension CoreDataCatalogRepository {
+    nonisolated static func insert<T: NSManagedObject>(
+        _ entityName: String,
+        into context: NSManagedObjectContext
+    ) throws -> T {
+        guard let entity = NSEntityDescription.entity(forEntityName: entityName, in: context) else {
+            throw CatalogRepositoryError.invalidManagedObjectModel
+        }
+
+        let expectedClassName = NSStringFromClass(T.self)
+        guard
+            entity.managedObjectClassName == expectedClassName,
+            let runtimeClass = NSClassFromString(expectedClassName),
+            runtimeClass === T.self
+        else {
+            throw CatalogRepositoryError.invalidManagedObjectModel
+        }
+
+        return T(entity: entity, insertInto: context)
     }
 }
 
@@ -1055,7 +1077,7 @@ private extension CoreDataCatalogRepository {
             return room
         case .new(let name):
             let normalizedName = try requiredName(name)
-            let room: Room = insert("Room", into: context)
+            let room: Room = try insert("Room", into: context)
             room.name = normalizedName
             room.sortOrder = nextSortOrder(in: managedObjects(place.rooms, as: Room.self).map(\.sortOrder))
             room.place = place
@@ -1078,7 +1100,7 @@ private extension CoreDataCatalogRepository {
             return area
         case .new(let name):
             let normalizedName = try requiredName(name)
-            let area: Area = insert("Area", into: context)
+            let area: Area = try insert("Area", into: context)
             area.name = normalizedName
             area.sortOrder = nextSortOrder(in: managedObjects(room.areas, as: Area.self).map(\.sortOrder))
             area.room = room
@@ -1119,7 +1141,7 @@ private extension CoreDataCatalogRepository {
                 target: .container(id)
             )
         case .newContainer(let name):
-            let container: Container = insert("Container", into: context)
+            let container: Container = try insert("Container", into: context)
             container.name = try requiredName(name)
             container.sortOrder = nextSortOrder(
                 in: managedObjects(area.containers, as: Container.self).map(\.sortOrder)
@@ -1175,7 +1197,7 @@ private extension CoreDataCatalogRepository {
         for target: QRTargetObject,
         in context: NSManagedObjectContext
     ) throws {
-        let qrCode: QRCode = insert("QRCode", into: context)
+        let qrCode: QRCode = try insert("QRCode", into: context)
         qrCode.token = token.rawValue
         qrCode.state = "bound"
         qrCode.boundAt = Date()
@@ -1343,7 +1365,7 @@ private extension CoreDataCatalogRepository {
                 context.delete(obsolete)
             }
             guard let place = owner.place else { throw CatalogRepositoryError.invalidStoredHierarchy }
-            let photo: PhotoAsset = insert("PhotoAsset", into: context)
+            let photo: PhotoAsset = try insert("PhotoAsset", into: context)
             photo.data = draft.jpegData
             photo.thumbnailData = draft.thumbnailJPEGData
             photo.contentType = draft.contentType.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1437,10 +1459,6 @@ private extension CoreDataCatalogRepository {
 
     nonisolated static func boundQRCodes(of set: NSSet?) -> [QRCode] {
         managedObjects(set, as: QRCode.self).filter { $0.state == "bound" }
-    }
-
-    nonisolated static func insert<T: NSManagedObject>(_ entityName: String, into context: NSManagedObjectContext) -> T {
-        NSEntityDescription.insertNewObject(forEntityName: entityName, into: context) as! T
     }
 
     nonisolated static func nilIfEmpty(_ value: String?) -> String? {
