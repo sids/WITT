@@ -8,11 +8,19 @@ public struct QRToken: RawRepresentable, Hashable, Sendable, Codable {
     public let rawValue: String
 
     public init?(rawValue: String) {
-        guard Self.isCanonical(rawValue) else {
+        guard !rawValue.isEmpty else {
             return nil
         }
 
         self.rawValue = rawValue
+    }
+
+    public init?(scannedPayload: String) {
+        if let generatedURL = try? WITTQRCodeURL(scannedPayload) {
+            self = generatedURL.token
+        } else {
+            self.init(rawValue: scannedPayload)
+        }
     }
 
     public init(validating rawValue: String) throws {
@@ -43,7 +51,7 @@ public struct QRToken: RawRepresentable, Hashable, Sendable, Codable {
         return token
     }
 
-    private static func isCanonical(_ value: String) -> Bool {
+    static func isCanonicalGeneratedToken(_ value: String) -> Bool {
         guard value.utf8.count == encodedCharacterCount else {
             return false
         }
@@ -82,7 +90,7 @@ public struct QRToken: RawRepresentable, Hashable, Sendable, Codable {
         } catch {
             throw DecodingError.dataCorruptedError(
                 in: container,
-                debugDescription: "Expected a canonical 128-bit base64url QR token."
+                debugDescription: "Expected a non-empty QR payload."
             )
         }
     }

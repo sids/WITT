@@ -78,6 +78,21 @@ final class CatalogRepositoryTests: XCTestCase {
         XCTAssertFalse(remainingTargets.contains { $0.id == area.id })
     }
 
+    func testArbitraryPayloadBindsAndResolvesByExactIdentity() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
+        let payload = try XCTUnwrap(QRToken(rawValue: "  vendor:item/42?serial=A+B  "))
+
+        _ = try await repository.bindQRCode(.init(token: payload, target: target))
+
+        let exactResolution = try await repository.resolve(payload)
+        let trimmedPayload = try XCTUnwrap(QRToken(rawValue: "vendor:item/42?serial=A+B"))
+        let trimmedResolution = try await repository.resolve(trimmedPayload)
+        XCTAssertEqual(exactResolution, .knownArea(QRTargetID(rawValue: area.id)))
+        XCTAssertEqual(trimmedResolution, .unknown)
+    }
+
     func testCreateAreaWithQRCodeIsAtomicAndPreservesDraftFields() async throws {
         let (repository, persistence, place) = try await makeSampleRepository()
         let room = try XCTUnwrap(place.rooms.first)
@@ -138,6 +153,26 @@ final class CatalogRepositoryTests: XCTestCase {
         }
     }
 
+    func testCreateTargetsAtomicallyBindArbitraryPayloads() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let room = try XCTUnwrap(place.rooms.first)
+        let area = try XCTUnwrap(place.areas.first)
+        let areaPayload = try XCTUnwrap(QRToken(rawValue: "AREA 001 / upper shelf"))
+        let containerPayload = try XCTUnwrap(QRToken(rawValue: "https://labels.example/box?id=7&lot=A+B"))
+
+        let createdArea = try await repository.createArea(.init(
+            roomID: room.id, name: "Arbitrary Area", qrToken: areaPayload
+        ))
+        let createdContainer = try await repository.createContainer(.init(
+            name: "Arbitrary Container", destination: .area(area.id), qrToken: containerPayload
+        ))
+
+        let areaResolution = try await repository.resolve(areaPayload)
+        let containerResolution = try await repository.resolve(containerPayload)
+        XCTAssertEqual(areaResolution, .knownArea(QRTargetID(rawValue: createdArea.id)))
+        XCTAssertEqual(containerResolution, .knownContainer(QRTargetID(rawValue: createdContainer.id)))
+    }
+
     func testCreateTargetsRejectUsedQRCodeWithoutCreatingTargets() async throws {
         let (repository, _, place) = try await makeSampleRepository()
         let room = try XCTUnwrap(place.rooms.first)
@@ -168,7 +203,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let area = try XCTUnwrap(place.areas.first)
         let container = try XCTUnwrap(place.containers.first)
         let oldAreaToken = try QRToken.generate()
-        let newAreaToken = try QRToken.generate()
+        let newAreaToken = try XCTUnwrap(QRToken(rawValue: "custom area label / lower shelf"))
         let oldContainerToken = try QRToken.generate()
         let newContainerToken = try QRToken.generate()
         let areaTarget = QRBindingTarget.area(QRTargetID(rawValue: area.id))
@@ -209,6 +244,32 @@ final class CatalogRepositoryTests: XCTestCase {
         let secondResolution = try await repository.resolve(secondToken)
         XCTAssertEqual(firstResolution, .knownArea(QRTargetID(rawValue: first.id)))
         XCTAssertEqual(secondResolution, .knownArea(QRTargetID(rawValue: second.id)))
+    }
+
+    func testReplaceArbitraryPayloadReleasesOldBindingAndRefusesConflict() async throws {
+        let (repository, _, place) = try await makeSampleRepository()
+        let areas = place.areas.prefix(2)
+        let first = try XCTUnwrap(areas.first)
+        let second = try XCTUnwrap(areas.last)
+        let oldPayload = try XCTUnwrap(QRToken(rawValue: "legacy generated-like label"))
+        let replacement = try XCTUnwrap(QRToken(rawValue: "external://label/42?x=A+B"))
+        let occupied = try XCTUnwrap(QRToken(rawValue: "occupied payload"))
+        let firstTarget = QRBindingTarget.area(QRTargetID(rawValue: first.id))
+        let secondTarget = QRBindingTarget.area(QRTargetID(rawValue: second.id))
+        _ = try await repository.bindQRCode(.init(token: oldPayload, target: firstTarget))
+        _ = try await repository.bindQRCode(.init(token: occupied, target: secondTarget))
+
+        _ = try await repository.replaceQRCode(.init(token: replacement, target: firstTarget))
+        await assertRepositoryError(.tokenAlreadyBound) {
+            _ = try await repository.replaceQRCode(.init(token: occupied, target: firstTarget))
+        }
+
+        let oldResolution = try await repository.resolve(oldPayload)
+        let replacementResolution = try await repository.resolve(replacement)
+        let occupiedResolution = try await repository.resolve(occupied)
+        XCTAssertEqual(oldResolution, .unknown)
+        XCTAssertEqual(replacementResolution, .knownArea(QRTargetID(rawValue: first.id)))
+        XCTAssertEqual(occupiedResolution, .knownArea(QRTargetID(rawValue: second.id)))
     }
 
     func testReplaceQRCodeWithSameTargetIsIdempotentAndRemovesOtherTargetRows() async throws {

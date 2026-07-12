@@ -16,14 +16,17 @@ struct QRDeepLinkRouter: Sendable {
 
     func destination(for url: URL) async throws -> QRDeepLinkDestination {
         let qrURL = try WITTQRCodeURL(url: url)
+        return try await destination(for: qrURL.token)
+    }
 
-        switch try await resolver.resolve(qrURL.token) {
+    func destination(for token: QRToken) async throws -> QRDeepLinkDestination {
+        switch try await resolver.resolve(token) {
         case .knownArea(let id):
             return .addThing(.area(id.rawValue))
         case .knownContainer(let id):
             return .addThing(.container(id.rawValue))
         case .unknown:
-            return .attach(qrURL.token)
+            return .attach(token)
         case .needsRepair:
             return .needsRepair
         case .conflict:

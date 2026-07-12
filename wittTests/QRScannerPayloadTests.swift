@@ -2,14 +2,30 @@ import XCTest
 @testable import witt
 
 final class QRScannerPayloadTests: XCTestCase {
-    func testScannerOutcomeAcceptsAbsoluteURLForDeferredRouting() {
-        let url = URL(string: "witt://qr/v1/BBBBBBBBBBBBBBBBBBBBBA")!
+    func testScannerOutcomeUnwrapsGeneratedURLForLegacyStoredTokenLookup() throws {
+        let payload = "witt://qr/v1/BBBBBBBBBBBBBBBBBBBBBA"
+        let storedToken = try XCTUnwrap(QRToken(rawValue: "BBBBBBBBBBBBBBBBBBBBBA"))
 
-        XCTAssertEqual(ScannerOutcome(payload: url.absoluteString), .url(url))
+        XCTAssertEqual(ScannerOutcome(payload: payload), .payload(storedToken))
     }
 
-    func testScannerOutcomeRejectsPayloadWithoutURLScheme() {
-        XCTAssertEqual(ScannerOutcome(payload: "not a URL"), .invalidURL)
+    func testScannerOutcomeAcceptsAndExactlyPreservesArbitraryPayload() throws {
+        let payload = "  vendor:item/42?serial=A+B  "
+
+        XCTAssertEqual(ScannerOutcome(payload: payload), .payload(try XCTUnwrap(QRToken(rawValue: payload))))
+    }
+
+    func testScannerOutcomeRejectsEmptyPayload() {
+        XCTAssertEqual(ScannerOutcome(payload: ""), .invalidPayload)
+    }
+
+    func testScannerOutcomePreservesMalformedWITTLikePayloadAsArbitraryIdentity() throws {
+        let payload = "witt://qr/v2/not-a-generated-token"
+
+        XCTAssertEqual(
+            ScannerOutcome(payload: payload),
+            .payload(try XCTUnwrap(QRToken(rawValue: payload)))
+        )
     }
 
     func testDeduplicatorSuppressesSamePayloadInsideWindow() {

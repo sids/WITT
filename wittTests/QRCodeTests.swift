@@ -13,20 +13,47 @@ final class QRCodeTests: XCTestCase {
         XCTAssertNotEqual(first, second)
     }
 
-    func testTokenRejectsNonCanonicalValues() {
-        XCTAssertNil(QRToken(rawValue: "too-short"))
-        XCTAssertNil(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAA="))
-        XCTAssertNil(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAA+"))
-        XCTAssertNil(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAAB"))
+    func testTokenAcceptsAnyNonEmptyPayloadAndPreservesExactIdentity() throws {
+        let payload = "  https://vendor.example/item?id=A+B#part  "
+
+        XCTAssertEqual(try XCTUnwrap(QRToken(rawValue: payload)).rawValue, payload)
+        XCTAssertNil(QRToken(rawValue: ""))
     }
 
     func testQRCodeURLRoundTripsExactly() throws {
         let token = try XCTUnwrap(QRToken(rawValue: canonicalToken))
-        let value = WITTQRCodeURL(token: token)
+        let value = try WITTQRCodeURL(token: token)
 
         XCTAssertEqual(value.absoluteString, "witt://qr/v1/AAAAAAAAAAAAAAAAAAAAAA")
         XCTAssertEqual(try WITTQRCodeURL(value.absoluteString), value)
         XCTAssertEqual(try WITTQRCodeURL(url: value.url), value)
+    }
+
+    func testScannedGeneratedURLMapsToLegacyRawToken() throws {
+        let token = try XCTUnwrap(QRToken(rawValue: canonicalToken))
+
+        XCTAssertEqual(
+            QRToken(scannedPayload: try WITTQRCodeURL(token: token).absoluteString),
+            token
+        )
+    }
+
+    func testQRCodeURLConstructionRejectsArbitraryPayloadWithoutTrapping() throws {
+        let arbitrary = try XCTUnwrap(QRToken(rawValue: "vendor inventory #42"))
+
+        XCTAssertThrowsError(try WITTQRCodeURL(token: arbitrary)) { error in
+            XCTAssertEqual(error as? WITTQRCodeURLError, .invalidToken)
+        }
+    }
+
+    func testQRCodeURLDecodingCannotBypassGeneratedTokenValidation() {
+        let encoded = Data(#"{"token":"vendor inventory #42"}"#.utf8)
+
+        XCTAssertThrowsError(try JSONDecoder().decode(WITTQRCodeURL.self, from: encoded)) { error in
+            guard case DecodingError.dataCorrupted = error else {
+                return XCTFail("Expected data-corrupted decoding error, got \(error)")
+            }
+        }
     }
 
     func testQRCodeURLRejectsMalformedComponents() {

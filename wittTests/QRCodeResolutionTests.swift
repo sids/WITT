@@ -37,7 +37,7 @@ final class QRCodeResolutionTests: XCTestCase {
         let areaID = QRTargetID(rawValue: UUID())
         let router = QRDeepLinkRouter(resolver: StubResolver(result: .knownArea(areaID)))
 
-        let destination = try await router.destination(for: WITTQRCodeURL(token: token).url)
+        let destination = try await router.destination(for: try WITTQRCodeURL(token: token).url)
 
         guard case .addThing(.area(let routedID)) = destination else {
             return XCTFail("Expected the known Storage Area destination")
@@ -49,12 +49,37 @@ final class QRCodeResolutionTests: XCTestCase {
         let token = try XCTUnwrap(QRToken(rawValue: "BBBBBBBBBBBBBBBBBBBBBA"))
         let router = QRDeepLinkRouter(resolver: StubResolver(result: .unknown))
 
-        let destination = try await router.destination(for: WITTQRCodeURL(token: token).url)
+        let destination = try await router.destination(for: try WITTQRCodeURL(token: token).url)
 
         guard case .attach(let routedToken) = destination else {
             return XCTFail("Expected the unknown QR attachment destination")
         }
         XCTAssertEqual(routedToken, token)
+    }
+
+    func testScannerRouterPreservesKnownArbitraryPayloadDestination() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "vendor inventory #42"))
+        let containerID = QRTargetID(rawValue: UUID())
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .knownContainer(containerID)))
+
+        let destination = try await router.destination(for: token)
+
+        guard case .addThing(.container(let routedID)) = destination else {
+            return XCTFail("Expected the known Container destination")
+        }
+        XCTAssertEqual(routedID, containerID.rawValue)
+    }
+
+    func testScannerRouterPreservesUnknownArbitraryPayloadForAttachment() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "https://example.com/items/42?variant=A+B"))
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .unknown))
+
+        let destination = try await router.destination(for: token)
+
+        guard case .attach(let routedToken) = destination else {
+            return XCTFail("Expected the unknown QR attachment destination")
+        }
+        XCTAssertEqual(routedToken.rawValue, token.rawValue)
     }
 }
 

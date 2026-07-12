@@ -29,6 +29,15 @@ final class QRCodeSheetTests: XCTestCase {
         }
     }
 
+    func testBatchRejectsArbitraryPayloadInsteadOfConstructingGeneratedURL() throws {
+        let arbitrary = try XCTUnwrap(QRToken(rawValue: "vendor inventory #42"))
+        let generator = QRCodeSheetBatchGenerator(tokenGenerator: { arbitrary })
+
+        XCTAssertThrowsError(try generator.generate(count: 1)) { error in
+            XCTAssertEqual(error as? WITTQRCodeURLError, .invalidToken)
+        }
+    }
+
     func testMillimetersConvertToPDFPointsAndBack() {
         XCTAssertEqual(PDFMeasurement.points(fromMillimeters: 25.4), 72, accuracy: 0.0001)
         XCTAssertEqual(PDFMeasurement.points(fromMillimeters: 210), 595.2756, accuracy: 0.001)
@@ -271,7 +280,7 @@ final class QRCodeSheetTests: XCTestCase {
     func testRenderedQRCodeHasCrispSymmetricQuietZone() throws {
         let token = try XCTUnwrap(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAAA"))
         let image = try XCTUnwrap(QRCodeSheetPDFGenerator.makeQRCode(
-            payload: WITTQRCodeURL(token: token).absoluteString,
+            payload: try WITTQRCodeURL(token: token).absoluteString,
             targetSide: 160
         ))
         var pixels = [UInt8](repeating: 0, count: image.width * image.height)

@@ -54,7 +54,7 @@ struct QRCodeSheetBatchGenerator {
             guard seen.insert(token).inserted else {
                 throw QRCodeSheetError.duplicateToken
             }
-            codes.append(PrintableQRCode(token: token, url: WITTQRCodeURL(token: token)))
+            codes.append(PrintableQRCode(token: token, url: try WITTQRCodeURL(token: token)))
         }
         return codes
     }

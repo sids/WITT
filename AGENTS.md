@@ -1,6 +1,6 @@
 # WITT Agent Brief
 
-WITT means "Where Is The Thing?" This repo is for a native iOS app that helps people catalogue items in storage areas around a home or other place so they can later answer, quickly and confidently, where an item is.
+WITT means "Where Is That Thing?" This repo is for a native iOS app that helps people catalogue items in storage areas around a home or other place so they can later answer, quickly and confidently, where an item is.
 
 The human product manager is Sid. Treat this project as product-led: clarify user workflows, preserve product decisions, and keep implementation threads aligned with the product brief instead of letting the code drift into generic inventory software.
 
@@ -35,7 +35,7 @@ Core hierarchy:
 QR codes are central to the experience:
 
 1. QR codes are associated with areas and containers.
-2. QR codes use `witt://` URLs so scanning opens the app directly.
+2. The in-app scanner accepts any QR code with a non-empty payload. WITT-generated labels use versioned `witt://` URLs so scanning them outside the app can launch WITT directly.
 3. The app should generate a printable PDF grid of random QR codes.
 4. Scanning an unassociated QR code should offer to bind it to an existing or new area/container.
 5. Scanning a known QR code should open the add-item flow: take a photo, immediately use AI to label and keyword it, then let the user review, edit, and save.
@@ -63,12 +63,12 @@ The repo now contains the seventh integrated implementation milestone:
 - Camera and Photos picker adapters normalize orientation, strip metadata, cap full images at 2048 px, create 320 px thumbnails, and persist explicit `PhotoAsset` records.
 - The confirmed `iCloud.in.sids.witt` container, iCloud/remote-notification entitlements, private/shared Core Data stores, Place-rooted read/write sharing UI, and invitation acceptance are wired.
 - The one-screen create-and-attach flow can atomically create or select a Room, Storage Area, and Container before binding a scanned QR code.
-- New Storage Area and Container forms can scan and atomically bind an unused QR label. Existing target screens use a shared full-screen scanner for Attach/Reattach; replacement releases the former label while refusing codes attached elsewhere. QR status is not shown in the content layer.
+- New Storage Area and Container forms can scan and atomically bind any unused QR code with a non-empty payload. Existing target screens use a shared full-screen scanner for Attach/Reattach; replacement releases the former label while refusing codes attached elsewhere. Arbitrary payloads preserve exact identity, valid generated WITT URLs remain compatible with legacy raw-token rows, and QR status is not shown in the content layer.
 - Printable random QR labels support A4, US Letter, and Custom paper. Built-in dimensions are automatic; Custom accepts metric width and fixed or unlimited length. Four paper margins, exact label width/height, and horizontal/vertical gaps derive the grid. Custom defaults to the linked 100 mm four-up roll with contiguous 25 × 25 mm square labels. Square labels render QR-only; rectangular labels put the short ID beside the QR and can add a write-in line below it. Output remains dimensionally validated, high contrast, Quick Look previewable, shareable/printable, and does not persist unbound tokens.
 - Explicit repository and store contracts cover manual create, edit, same-Place move, photo replacement/removal, and cascading archive for Place, Room, Storage Area, Container, and Thing. Native one-screen management forms, context-aware add menus, live detail navigation, archive confirmations, and iPhone/iPad Browse integration are implemented.
 - Core Data entity and Swift names remain domain-native, while every managed-object Objective-C runtime name is WITT-prefixed to avoid global class collisions. Repository insertion validates the entity-to-type contract and constructs the requested type directly, so model mismatches become controlled errors rather than Core Data aborts. Build-4 entity hashes are pinned to prove store compatibility.
 - A Responses-compatible vision adapter validates normalized JPEGs, requests strict structured suggestions with provider storage disabled, maps transport/provider failures, and is injected into both Thing-creation paths. Runtime configuration is environment-only through `WITT_AI_RESPONSES_URL`, `WITT_AI_MODEL`, and `WITT_AI_BEARER_TOKEN`; no provider secret belongs in the app bundle. Debug builds use the deterministic mock only when no AI configuration is present, while unconfigured release builds fail honestly into manual entry.
-- The `wittTests` target has 134 passing simulator tests in Debug and Release-optimized configurations, covering persistence, runtime class mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, atomic QR creation/replacement, QR routing/scanning/printing and fixed/continuous physical label geometry, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
+- The `wittTests` target has 145 passing simulator tests in Debug and Release-optimized configurations, covering persistence, runtime class mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, arbitrary and generated QR identity compatibility, atomic QR creation/replacement, QR routing/scanning/printing and fixed/continuous physical label geometry, photo normalization, AI transport and management-form helpers, presentation behavior, and Place sharing helpers.
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
@@ -82,19 +82,20 @@ When launching implementation or research work in separate Codex threads:
 
 1. Use the `/Users/sid/src/witt` project.
 2. Default to Medium thinking.
-3. Increase thinking for architecture, Core Data/iCloud sharing, deep linking, camera/QR scanning, and security-sensitive work.
-4. Decrease thinking for narrow mechanical tasks, formatting, or small copy changes.
-5. Give each worker a tight brief with:
+3. Use only Light, Medium, or High thinking for subagents; do not select any other reasoning level.
+4. Increase thinking for architecture, Core Data/iCloud sharing, deep linking, camera/QR scanning, and security-sensitive work.
+5. Decrease thinking for narrow mechanical tasks, formatting, or small copy changes.
+6. Give each worker a tight brief with:
    - the product goal,
    - relevant files,
    - expected deliverable,
    - verification required,
    - instruction to preserve unrelated user changes.
-6. Ask workers to update the relevant file under `docs/` when their work changes durable product, architecture, status, release, or planning context.
-7. Read thread results before integrating or assigning dependent work.
-8. Add significant new documents to `docs/README.md`; remove superseded plans and proposals instead of maintaining historical duplicates.
-9. Use `docs/todo.md` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
-10. For UI work, capture simulator screenshots after integration and share them with Sid in the project-manager thread before considering the work complete. Include every materially changed screen, relevant empty and populated states, and iPhone/iPad evidence when the layouts differ. Screenshots are review artifacts, not a substitute for build and test verification.
+7. Ask workers to update the relevant file under `docs/` when their work changes durable product, architecture, status, release, or planning context.
+8. Read thread results before integrating or assigning dependent work.
+9. Add significant new documents to `docs/README.md`; remove superseded plans and proposals instead of maintaining historical duplicates.
+10. Use `docs/todo.md` as the only live backlog. Add incoming feedback to its inbox, move triaged work into a priority section, and update task state after implementation and verification.
+11. For UI work, capture simulator screenshots after integration and share them with Sid in the project-manager thread before considering the work complete. Include every materially changed screen, relevant empty and populated states, and iPhone/iPad evidence when the layouts differ. Screenshots are review artifacts, not a substitute for build and test verification.
 
 Prefer worktree threads for substantive code changes so efforts stay isolated. Use local project threads for quick read-only research or small repo inspection tasks.
 

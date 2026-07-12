@@ -7,7 +7,10 @@ public struct WITTQRCodeURL: Hashable, Sendable, Codable {
 
     public let token: QRToken
 
-    public init(token: QRToken) {
+    public init(token: QRToken) throws {
+        guard QRToken.isCanonicalGeneratedToken(token.rawValue) else {
+            throw WITTQRCodeURLError.invalidToken
+        }
         self.token = token
     }
 
@@ -48,7 +51,8 @@ public struct WITTQRCodeURL: Hashable, Sendable, Codable {
 
         let tokenString = String(pathComponents[2])
 
-        guard let parsedToken = QRToken(rawValue: tokenString) else {
+        guard QRToken.isCanonicalGeneratedToken(tokenString),
+              let parsedToken = QRToken(rawValue: tokenString) else {
             throw WITTQRCodeURLError.invalidToken
         }
         token = parsedToken
@@ -62,12 +66,35 @@ public struct WITTQRCodeURL: Hashable, Sendable, Codable {
         try self.init(url.absoluteString)
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case token
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedToken = try container.decode(QRToken.self, forKey: .token)
+        do {
+            try self.init(token: decodedToken)
+        } catch {
+            throw DecodingError.dataCorruptedError(
+                forKey: .token,
+                in: container,
+                debugDescription: "Expected a canonical generated WITT QR token."
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(token, forKey: .token)
+    }
+
     public var absoluteString: String {
         "\(Self.scheme)://\(Self.host)/\(Self.version)/\(token.rawValue)"
     }
 
     public var url: URL {
-        // QRToken permits only unreserved URL characters, so this URL is guaranteed valid.
+        // Every WITTQRCodeURL initializer enforces a canonical generated token.
         URL(string: absoluteString)!
     }
 }

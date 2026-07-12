@@ -162,13 +162,44 @@ struct AppShellView: View {
         guard let outcome = pendingScannerOutcome else { return }
         pendingScannerOutcome = nil
         switch outcome {
-        case .url(let url):
-            handleDeepLink(url)
-        case .invalidURL:
+        case .payload(let token):
+            routeScannedPayload(token)
+        case .invalidPayload:
             deepLinkAlert = DeepLinkAlert(
                 title: "Invalid QR Code",
-                message: "This QR code does not contain a valid URL."
+                message: "This QR code does not contain a usable payload."
             )
+        }
+    }
+
+    private func routeScannedPayload(_ token: QRToken) {
+        guard !isRoutingQRCode else { return }
+        isRoutingQRCode = true
+        Task {
+            defer { isRoutingQRCode = false }
+            do {
+                switch try await deepLinkRouter.destination(for: token) {
+                case .addThing(let destination):
+                    presentedScan = ScanPresentation(flow: .capture(destination))
+                case .attach(let token):
+                    presentedScan = ScanPresentation(flow: .attach(token))
+                case .needsRepair:
+                    deepLinkAlert = DeepLinkAlert(
+                        title: "QR Code Needs Attention",
+                        message: "This code was previously attached, but its Storage Area or Container is no longer available."
+                    )
+                case .conflict:
+                    deepLinkAlert = DeepLinkAlert(
+                        title: "QR Code Conflict",
+                        message: "This code is attached to more than one destination and needs to be repaired before use."
+                    )
+                }
+            } catch {
+                deepLinkAlert = DeepLinkAlert(
+                    title: "Unable to Read QR Code",
+                    message: "WITT could not look up this QR code. Try scanning it again."
+                )
+            }
         }
     }
 
@@ -211,15 +242,15 @@ struct AppShellView: View {
 }
 
 enum ScannerOutcome: Equatable {
-    case url(URL)
-    case invalidURL
+    case payload(QRToken)
+    case invalidPayload
 
     init(payload: String) {
-        guard let url = URL(string: payload), url.scheme != nil else {
-            self = .invalidURL
+        guard let token = QRToken(scannedPayload: payload) else {
+            self = .invalidPayload
             return
         }
-        self = .url(url)
+        self = .payload(token)
     }
 }
 

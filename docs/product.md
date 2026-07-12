@@ -1,6 +1,6 @@
 # WITT Product
 
-WITT means "Where Is The Thing?" It is a native iOS app for people who need to catalogue belongings across a home or another real-world place and later answer, quickly and confidently, where an item is. It is designed for individuals, households, and trusted collaborators working in messy storage environments with nested containers, similar-looking things, and locations that change over time.
+WITT means "Where Is That Thing?" It is a native iOS app for people who need to catalogue belongings across a home or another real-world place and later answer, quickly and confidently, where an item is. It is designed for individuals, households, and trusted collaborators working in messy storage environments with nested containers, similar-looking things, and locations that change over time.
 
 ## Product Vocabulary
 
@@ -30,9 +30,9 @@ Place
 - WITT is a practical home-cataloguing product, not generic warehouse or business inventory software.
 - Browse, search, editing, QR routing, and sharing operate on persistent catalogue data, not demo content.
 - Photos are supported for Places, Storage Areas, Containers, and Things. Thing capture accepts the camera or photo library.
-- QR codes use `witt://` links and attach only to Storage Areas and Containers. Rooms and Things do not receive QR codes in the MVP.
+- Any non-empty QR-code payload can attach to a Storage Area or Container. WITT-generated labels use versioned `witt://` links so scanning them outside the app can launch WITT directly. Rooms and Things do not receive QR codes in the MVP.
 - The current attach flow offers targets without an active QR. Whether WITT should support multiple active QR codes per target remains a product decision in [todo.md](todo.md).
-- New Storage Areas and Containers may scan and bind an unused WITT QR code before saving. Existing targets expose Attach QR Code or Reattach QR Code from their navigation action menu. Reattaching replaces that target's current binding and makes its former label unassigned again; WITT must reject, rather than silently move, a scanned code already attached elsewhere.
+- New Storage Areas and Containers may scan and bind any unused QR code before saving. Existing targets expose Attach QR Code or Reattach QR Code from their navigation action menu. Reattaching replaces that target's current binding and makes its former label unassigned again; WITT must reject, rather than silently move, a scanned code already attached elsewhere.
 - Things always have one current location and can be moved within the same Place.
 - Containers may be nested. Archiving a parent archives its contained catalogue branch after confirmation.
 - Sharing is rooted at the Place and grants invited participants complete read/write collaboration for that Place.
@@ -41,7 +41,7 @@ Place
 
 ## QR-First Cataloguing
 
-The trailing Scan QR control is a first-class entry point for repeated cataloguing while moving around a home. WITT scans real QR codes and also handles `witt://` links opened outside the scanner.
+The trailing Scan QR control is a first-class entry point for repeated cataloguing while moving around a home. The in-app scanner accepts any QR code with a non-empty payload. WITT also handles its own versioned `witt://` links when another scanner or camera app opens them directly.
 
 ### Known QR
 
