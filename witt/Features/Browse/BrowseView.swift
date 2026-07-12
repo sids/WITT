@@ -989,13 +989,87 @@ private struct NewStorageAreaRow: View {
 }
 
 private struct DashedCreateBorder: View {
+    private let cornerRadius: CGFloat = 8
+    private let lineWidth: CGFloat = 1
+
     var body: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .stroke(
-                Color.accentColor,
-                style: StrokeStyle(lineWidth: 1, dash: [6, 4])
+        Canvas { context, size in
+            context.stroke(
+                sidePath(in: size),
+                with: .color(Color.accentColor),
+                style: StrokeStyle(
+                    lineWidth: lineWidth,
+                    lineCap: .round,
+                    dash: [6, 4]
+                )
             )
-            .accessibilityHidden(true)
+            context.stroke(
+                cornerPath(in: size),
+                with: .color(Color.accentColor),
+                style: StrokeStyle(
+                    lineWidth: lineWidth,
+                    lineCap: .round,
+                    lineJoin: .round
+                )
+            )
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func sidePath(in size: CGSize) -> Path {
+        let (rect, radius) = drawingGeometry(in: size)
+
+        return Path { path in
+            path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY + radius))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+
+            path.move(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+
+            path.move(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+        }
+    }
+
+    private func cornerPath(in size: CGSize) -> Path {
+        let (rect, radius) = drawingGeometry(in: size)
+        // The shoulders keep these short corner paths from being culled by the iOS renderer.
+        let shoulder: CGFloat = 10
+        let shallow = radius * 0.3826834
+        let diagonal = radius * 0.7071068
+        let deep = radius * 0.9238795
+        let corners: [(center: CGPoint, xInterior: CGFloat, yInterior: CGFloat)] = [
+            (CGPoint(x: rect.minX + radius, y: rect.minY + radius), 1, 1),
+            (CGPoint(x: rect.maxX - radius, y: rect.minY + radius), -1, 1),
+            (CGPoint(x: rect.maxX - radius, y: rect.maxY - radius), -1, -1),
+            (CGPoint(x: rect.minX + radius, y: rect.maxY - radius), 1, -1),
+        ]
+
+        return Path { path in
+            for corner in corners {
+                let center = corner.center
+                let x = corner.xInterior
+                let y = corner.yInterior
+
+                path.move(to: CGPoint(x: center.x + (x * shoulder), y: center.y - (y * radius)))
+                path.addLine(to: CGPoint(x: center.x, y: center.y - (y * radius)))
+                path.addLine(to: CGPoint(x: center.x - (x * shallow), y: center.y - (y * deep)))
+                path.addLine(to: CGPoint(x: center.x - (x * diagonal), y: center.y - (y * diagonal)))
+                path.addLine(to: CGPoint(x: center.x - (x * deep), y: center.y - (y * shallow)))
+                path.addLine(to: CGPoint(x: center.x - (x * radius), y: center.y))
+                path.addLine(to: CGPoint(x: center.x - (x * radius), y: center.y + (y * shoulder)))
+            }
+        }
+    }
+
+    private func drawingGeometry(in size: CGSize) -> (CGRect, CGFloat) {
+        let inset = lineWidth * 1.5
+        let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+        let radius = min(cornerRadius - (lineWidth / 2), rect.width / 2, rect.height / 2)
+        return (rect, radius)
     }
 }
 
