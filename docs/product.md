@@ -55,9 +55,9 @@ When no suitable target exists, or the user chooses Create & Attach, one screen 
 
 ## Browse And Creation
 
-Browse opens by default on the selected Place's Rooms screen; there is no Places screen. Its title is the Place name. A standard ellipsis menu beside the title contains Rename Place and Share Place. When the Place already has an active iCloud share, a separate Shared button appears immediately before the ellipsis and opens the system sharing details and participant actions.
+Browse opens by default on the selected Place's Rooms screen; there is no Places screen. Its title is the Place name. A standard ellipsis menu beside the title contains Rename Place and Share Place, followed by a divider and Print QR Labels. When the Place already has an active iCloud share, a separate Shared button appears immediately before the ellipsis and opens the system sharing details and participant actions.
 
-The system bottom toolbar follows the compact Mail pattern: a leading menu for switching or creating Places, system search in the center, and a trailing Scan QR button. The Place menu clearly marks the current Place and also retains access to Print QR Labels. Switching Places returns to that Place's Rooms screen. With no active Place, New Place is the primary path forward.
+The system bottom toolbar follows the compact Mail pattern: a leading menu for switching or creating Places, system search in the center, and a trailing Scan QR button. The Place menu clearly marks the current Place and stays focused on Place selection and creation. Switching Places returns to that Place's Rooms screen. With no active Place, New Place is the primary path forward.
 
 Browse follows the same hierarchy on iPhone and iPad: selected Place, Room, Storage Area or Container, then Thing. WITT remembers both the selected Place and deepest in-Place destination across launches, restoring the current hierarchy when content has moved. A missing or archived destination returns to the selected Place's Rooms screen; an unavailable selected Place falls back safely to another active Place. A Room selected explicitly from the Place root always replaces any previously restored path and opens that exact Room.
 
@@ -92,12 +92,13 @@ The trailing Scan QR button presents the live camera full-screen over Browse. A 
 
 ## Printable QR Labels
 
-WITT generates random, unassigned QR codes as a printable PDF. Generating a sheet does not persist or reserve those tokens; a code becomes part of the catalogue only when it is scanned and attached.
+WITT generates 1 to 120 random, unassigned QR codes as a printable PDF. Generating a sheet does not persist or reserve those tokens; a code becomes part of the catalogue only when it is scanned and attached.
 
-- **A4 and US Letter:** Fixed grid layouts with 6 to 60 labels in increments of six.
-- **Thermal Roll:** A continuous layout with 1 to 120 labels and configurable metric paper width, one to four QRs per row, row and column spacing, horizontal margins, and top and bottom margins.
-- **Labels:** Choose a short Code ID or a write-in line.
-- **Output:** Codes are crisp, high contrast, and validated to remain scannable. The app previews the PDF with Quick Look, then uses the native share and print flow.
+- **Paper:** Choose A4, US Letter, or Custom. A4 and US Letter supply their standard width and height automatically. Custom takes a metric width and either a fixed height or unlimited continuous-roll length.
+- **Physical layout:** Set left, right, top, and bottom paper margins; exact label width and height; and horizontal and vertical gaps. WITT derives the labels per row, labels per fixed page, and continuous output length from those measurements.
+- **Default stock:** Custom opens at 100 mm wide with unlimited length, 25 × 25 mm labels, and zero margins or gaps. This matches the linked True-Ally four-up 25 mm square roll.
+- **Label content:** A square label contains only its QR code. A rectangular label places its short Code ID beside the QR and can optionally add a write-in line below the ID.
+- **Output:** Codes are crisp, high contrast, and validated to keep at least a 20 mm QR frame. The app previews the dimensionally accurate PDF with Quick Look, then uses the native share and print flow.
 
 ## Sharing
 

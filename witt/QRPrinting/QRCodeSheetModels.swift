@@ -25,9 +25,9 @@ enum QRCodeSheetError: Error, Equatable, LocalizedError {
         case .duplicateToken:
             String(localized: "WITT couldn't generate a unique set of codes. Please try again.")
         case .invalidGeometry:
-            String(localized: "These roll settings do not leave enough printable space inside the margins.")
+            String(localized: "These paper, margin, and label settings do not leave enough printable space for one label.")
         case .qrGeometryTooSmall:
-            String(localized: "These roll settings make each QR code smaller than 20 mm. Use fewer codes per row, a wider roll, or smaller margins and spacing.")
+            String(localized: "These label dimensions make the QR code smaller than 20 mm. Use a larger label or a square label.")
         case .imageGenerationFailed:
             String(localized: "WITT couldn't render one of the QR codes. Please try again.")
         case .pdfGenerationFailed:
@@ -76,7 +76,7 @@ enum PDFMeasurement {
 enum QRCodeSheetPaper: String, CaseIterable, Identifiable, Sendable {
     case a4
     case letter
-    case thermal
+    case custom
 
     var id: Self { self }
 
@@ -84,172 +84,195 @@ enum QRCodeSheetPaper: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .a4: "A4"
         case .letter: "US Letter"
-        case .thermal: "Thermal Roll"
+        case .custom: "Custom"
         }
     }
 
-    var sheetPageSize: CGSize? {
+    var fixedSizeMillimeters: CGSize? {
         switch self {
-        case .a4: CGSize(width: 595.28, height: 841.89)
-        case .letter: CGSize(width: 612, height: 792)
-        case .thermal: nil
+        case .a4: CGSize(width: 210, height: 297)
+        case .letter: CGSize(width: 215.9, height: 279.4)
+        case .custom: nil
         }
     }
 }
 
-enum QRCodeSheetLabelStyle: String, CaseIterable, Identifiable, Sendable {
-    case codeID
-    case blankLine
+enum QRCodePaperLength: String, CaseIterable, Identifiable, Sendable {
+    case fixed
+    case unlimited
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .codeID: "Code ID"
-        case .blankLine: "Write-In"
+        case .fixed: "Fixed"
+        case .unlimited: "Unlimited"
         }
     }
 }
 
-struct QRCodeThermalLayoutConfiguration: Equatable, Sendable {
-    var paperWidthMillimeters: CGFloat = 62
-    var columns = 2
-    var rowSpacingMillimeters: CGFloat = 3
-    var columnSpacingMillimeters: CGFloat = 3
-    var horizontalMarginMillimeters: CGFloat = 3
-    var topMarginMillimeters: CGFloat = 3
-    var bottomMarginMillimeters: CGFloat = 3
+struct QRCodeSheetConfiguration: Equatable, Sendable {
+    var paper: QRCodeSheetPaper = .custom
+    var customPaperWidthMillimeters: CGFloat = 100
+    var customPaperHeightMillimeters: CGFloat = 100
+    var customPaperLength: QRCodePaperLength = .unlimited
+    var leftMarginMillimeters: CGFloat = 0
+    var rightMarginMillimeters: CGFloat = 0
+    var topMarginMillimeters: CGFloat = 0
+    var bottomMarginMillimeters: CGFloat = 0
+    var labelWidthMillimeters: CGFloat = 25
+    var labelHeightMillimeters: CGFloat = 25
+    var horizontalSpacingMillimeters: CGFloat = 0
+    var verticalSpacingMillimeters: CGFloat = 0
+    var includesWriteInLine = false
+
+    var paperWidthMillimeters: CGFloat {
+        paper.fixedSizeMillimeters?.width ?? customPaperWidthMillimeters
+    }
+
+    var fixedPaperHeightMillimeters: CGFloat? {
+        if let height = paper.fixedSizeMillimeters?.height {
+            return height
+        }
+        return customPaperLength == .fixed ? customPaperHeightMillimeters : nil
+    }
+
+    var usesUnlimitedLength: Bool {
+        paper == .custom && customPaperLength == .unlimited
+    }
+}
+
+struct QRCodeLabelContentLayout: Equatable, Sendable {
+    let transform: CGAffineTransform
+    let qrFrame: CGRect
+    let metadataFrame: CGRect?
 }
 
 struct QRCodeSheetLayout: Equatable, Sendable {
     static let minimumQRCodeSide = PDFMeasurement.points(fromMillimeters: 20)
     static let maximumPageHeight: CGFloat = 14_400
+    private static let rectangularContentGap = PDFMeasurement.points(fromMillimeters: 2)
+    private static let minimumMetadataWidth = PDFMeasurement.points(fromMillimeters: 14)
+    private static let squareTolerance = PDFMeasurement.points(fromMillimeters: 0.1)
 
     private enum Format: Equatable, Sendable {
-        case sheet(rows: Int)
-        case thermal
+        case fixed(rows: Int)
+        case unlimited
     }
 
     let pageSize: CGSize
-    let horizontalMargin: CGFloat
+    let leftMargin: CGFloat
+    let rightMargin: CGFloat
     let topMargin: CGFloat
     let bottomMargin: CGFloat
     let columns: Int
-    let rowSpacing: CGFloat
-    let columnSpacing: CGFloat
-    let labelHeight: CGFloat
+    let horizontalSpacing: CGFloat
+    let verticalSpacing: CGFloat
+    let labelSize: CGSize
     let qrSide: CGFloat
-    let cellHeight: CGFloat
+    let isSquareLabel: Bool
     private let format: Format
 
-    var margin: CGFloat { horizontalMargin }
-    var spacing: CGFloat { columnSpacing }
-
-    init(
-        paper: QRCodeSheetPaper,
-        margin: CGFloat = 36,
-        columns: Int = 3,
-        rows: Int = 4,
-        spacing: CGFloat = 14,
-        labelHeight: CGFloat = 18
-    ) {
-        precondition(paper != .thermal, "Use thermal(configuration:) for roll layouts.")
-        let pageSize = paper.sheetPageSize ?? .zero
-        let availableWidth = pageSize.width - (2 * margin) - (CGFloat(columns - 1) * spacing)
-        let availableHeight = pageSize.height - (2 * margin) - (CGFloat(rows - 1) * spacing)
-        let cellWidth = availableWidth / CGFloat(columns)
-        let cellHeight = availableHeight / CGFloat(rows)
-
-        self.pageSize = pageSize
-        horizontalMargin = margin
-        topMargin = margin
-        bottomMargin = margin
-        self.columns = columns
-        rowSpacing = spacing
-        columnSpacing = spacing
-        self.labelHeight = labelHeight
-        qrSide = floor(min(cellWidth - 2, cellHeight - labelHeight - 10))
-        self.cellHeight = cellHeight
-        format = .sheet(rows: rows)
-    }
-
-    static func thermal(
-        configuration: QRCodeThermalLayoutConfiguration,
-        labelHeight: CGFloat = 18
-    ) throws -> QRCodeSheetLayout {
+    init(configuration: QRCodeSheetConfiguration) throws {
         let width = PDFMeasurement.points(fromMillimeters: configuration.paperWidthMillimeters)
-        let horizontalMargin = PDFMeasurement.points(fromMillimeters: configuration.horizontalMarginMillimeters)
+        let fixedHeight = configuration.fixedPaperHeightMillimeters.map {
+            PDFMeasurement.points(fromMillimeters: $0)
+        }
+        let leftMargin = PDFMeasurement.points(fromMillimeters: configuration.leftMarginMillimeters)
+        let rightMargin = PDFMeasurement.points(fromMillimeters: configuration.rightMarginMillimeters)
         let topMargin = PDFMeasurement.points(fromMillimeters: configuration.topMarginMillimeters)
         let bottomMargin = PDFMeasurement.points(fromMillimeters: configuration.bottomMarginMillimeters)
-        let rowSpacing = PDFMeasurement.points(fromMillimeters: configuration.rowSpacingMillimeters)
-        let columnSpacing = PDFMeasurement.points(fromMillimeters: configuration.columnSpacingMillimeters)
+        let labelWidth = PDFMeasurement.points(fromMillimeters: configuration.labelWidthMillimeters)
+        let labelHeight = PDFMeasurement.points(fromMillimeters: configuration.labelHeightMillimeters)
+        let horizontalSpacing = PDFMeasurement.points(fromMillimeters: configuration.horizontalSpacingMillimeters)
+        let verticalSpacing = PDFMeasurement.points(fromMillimeters: configuration.verticalSpacingMillimeters)
+        let values = [
+            width,
+            leftMargin,
+            rightMargin,
+            topMargin,
+            bottomMargin,
+            labelWidth,
+            labelHeight,
+            horizontalSpacing,
+            verticalSpacing,
+        ] + (fixedHeight.map { [$0] } ?? [])
 
-        guard width > 0,
-              configuration.columns > 0,
-              horizontalMargin >= 0,
+        guard values.allSatisfy(\.isFinite),
+              width > 0,
+              labelWidth > 0,
+              labelHeight > 0,
+              leftMargin >= 0,
+              rightMargin >= 0,
               topMargin >= 0,
               bottomMargin >= 0,
-              rowSpacing >= 0,
-              columnSpacing >= 0 else {
+              horizontalSpacing >= 0,
+              verticalSpacing >= 0 else {
             throw QRCodeSheetError.invalidGeometry
         }
 
-        let availableWidth = width - (2 * horizontalMargin) - (CGFloat(configuration.columns - 1) * columnSpacing)
-        guard availableWidth > 0 else { throw QRCodeSheetError.invalidGeometry }
-        let cellWidth = availableWidth / CGFloat(configuration.columns)
-        let qrSide = floor(cellWidth)
-        guard qrSide >= minimumQRCodeSide else { throw QRCodeSheetError.qrGeometryTooSmall }
-
-        let cellHeight = qrSide + 10 + labelHeight
-        let minimumPageHeight = topMargin + cellHeight + bottomMargin
-        guard minimumPageHeight <= maximumPageHeight else { throw QRCodeSheetError.invalidGeometry }
-
-        return QRCodeSheetLayout(
-            pageSize: CGSize(width: width, height: minimumPageHeight),
-            horizontalMargin: horizontalMargin,
-            topMargin: topMargin,
-            bottomMargin: bottomMargin,
-            columns: configuration.columns,
-            rowSpacing: rowSpacing,
-            columnSpacing: columnSpacing,
-            labelHeight: labelHeight,
-            qrSide: qrSide,
-            cellHeight: cellHeight,
-            format: .thermal
+        let availableWidth = width - leftMargin - rightMargin
+        let columns = Self.fitCount(
+            available: availableWidth,
+            item: labelWidth,
+            spacing: horizontalSpacing
         )
-    }
+        guard columns > 0 else { throw QRCodeSheetError.invalidGeometry }
 
-    private init(
-        pageSize: CGSize,
-        horizontalMargin: CGFloat,
-        topMargin: CGFloat,
-        bottomMargin: CGFloat,
-        columns: Int,
-        rowSpacing: CGFloat,
-        columnSpacing: CGFloat,
-        labelHeight: CGFloat,
-        qrSide: CGFloat,
-        cellHeight: CGFloat,
-        format: Format
-    ) {
-        self.pageSize = pageSize
-        self.horizontalMargin = horizontalMargin
+        let isSquareLabel = abs(labelWidth - labelHeight) <= Self.squareTolerance
+        let contentWidth = max(labelWidth, labelHeight)
+        let contentHeight = min(labelWidth, labelHeight)
+        let qrSide = if isSquareLabel {
+            contentHeight
+        } else {
+            min(
+                contentHeight,
+                contentWidth - Self.rectangularContentGap - Self.minimumMetadataWidth
+            )
+        }
+        guard qrSide >= Self.minimumQRCodeSide else { throw QRCodeSheetError.qrGeometryTooSmall }
+
+        let resolvedFormat: Format
+        let resolvedPageHeight: CGFloat
+        if let fixedHeight {
+            guard fixedHeight > 0 else { throw QRCodeSheetError.invalidGeometry }
+            let availableHeight = fixedHeight - topMargin - bottomMargin
+            let rows = Self.fitCount(
+                available: availableHeight,
+                item: labelHeight,
+                spacing: verticalSpacing
+            )
+            guard rows > 0 else { throw QRCodeSheetError.invalidGeometry }
+            resolvedFormat = .fixed(rows: rows)
+            resolvedPageHeight = fixedHeight
+        } else {
+            let minimumPageHeight = topMargin + labelHeight + bottomMargin
+            guard minimumPageHeight <= Self.maximumPageHeight else {
+                throw QRCodeSheetError.invalidGeometry
+            }
+            resolvedFormat = .unlimited
+            resolvedPageHeight = minimumPageHeight
+        }
+
+        pageSize = CGSize(width: width, height: resolvedPageHeight)
+        self.leftMargin = leftMargin
+        self.rightMargin = rightMargin
         self.topMargin = topMargin
         self.bottomMargin = bottomMargin
         self.columns = columns
-        self.rowSpacing = rowSpacing
-        self.columnSpacing = columnSpacing
-        self.labelHeight = labelHeight
+        self.horizontalSpacing = horizontalSpacing
+        self.verticalSpacing = verticalSpacing
+        labelSize = CGSize(width: labelWidth, height: labelHeight)
         self.qrSide = qrSide
-        self.cellHeight = cellHeight
-        self.format = format
+        self.isSquareLabel = isSquareLabel
+        format = resolvedFormat
     }
 
     var codesPerPage: Int {
         switch format {
-        case let .sheet(rows):
+        case let .fixed(rows):
             columns * rows
-        case .thermal:
+        case .unlimited:
             columns * maximumRowsPerPage
         }
     }
@@ -265,48 +288,78 @@ struct QRCodeSheetLayout: Equatable, Sendable {
 
     func pageSize(at pageIndex: Int, codeCount: Int) -> CGSize {
         switch format {
-        case .sheet:
+        case .fixed:
             return pageSize
-        case .thermal:
+        case .unlimited:
             let remainingCodes = max(0, codeCount - (pageIndex * codesPerPage))
             let codesOnPage = min(codesPerPage, remainingCodes)
             let rowsOnPage = Int(ceil(Double(codesOnPage) / Double(columns)))
-            let contentHeight = CGFloat(rowsOnPage) * cellHeight
-            let spacingHeight = CGFloat(max(0, rowsOnPage - 1)) * rowSpacing
+            let contentHeight = CGFloat(rowsOnPage) * labelSize.height
+            let spacingHeight = CGFloat(max(0, rowsOnPage - 1)) * verticalSpacing
             return CGSize(width: pageSize.width, height: topMargin + contentHeight + spacingHeight + bottomMargin)
         }
     }
 
-    func cellFrame(at index: Int) -> CGRect {
-        let availableWidth = pageSize.width - (2 * horizontalMargin) - (CGFloat(columns - 1) * columnSpacing)
-        let cellWidth = availableWidth / CGFloat(columns)
+    func labelFrame(at index: Int) -> CGRect {
         let column = index % columns
         let row = index / columns
         return CGRect(
-            x: horizontalMargin + CGFloat(column) * (cellWidth + columnSpacing),
-            y: topMargin + CGFloat(row) * (cellHeight + rowSpacing),
-            width: cellWidth,
-            height: cellHeight
+            x: leftMargin + CGFloat(column) * (labelSize.width + horizontalSpacing),
+            y: topMargin + CGFloat(row) * (labelSize.height + verticalSpacing),
+            width: labelSize.width,
+            height: labelSize.height
         )
     }
 
-    func qrFrame(at index: Int) -> CGRect {
-        let cell = cellFrame(at: index)
-        return CGRect(
-            x: cell.midX - qrSide / 2,
-            y: cell.minY,
+    func contentLayout(at index: Int) -> QRCodeLabelContentLayout {
+        let label = labelFrame(at: index)
+        let isPortraitRectangle = !isSquareLabel && label.height > label.width
+        let contentSize = isPortraitRectangle
+            ? CGSize(width: label.height, height: label.width)
+            : label.size
+        let transform = if isPortraitRectangle {
+            CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: label.maxX, ty: label.minY)
+        } else {
+            CGAffineTransform(translationX: label.minX, y: label.minY)
+        }
+        let qrFrame = CGRect(
+            x: isSquareLabel ? (contentSize.width - qrSide) / 2 : 0,
+            y: (contentSize.height - qrSide) / 2,
             width: qrSide,
             height: qrSide
         )
-    }
+        let metadataFrame: CGRect? = if isSquareLabel {
+            nil
+        } else {
+            CGRect(
+                x: qrFrame.maxX + Self.rectangularContentGap,
+                y: 0,
+                width: contentSize.width - qrFrame.maxX - Self.rectangularContentGap,
+                height: contentSize.height
+            )
+        }
 
-    func identifierFrame(at index: Int) -> CGRect {
-        let cell = cellFrame(at: index)
-        return CGRect(x: cell.minX, y: cell.maxY - labelHeight, width: cell.width, height: labelHeight)
+        return QRCodeLabelContentLayout(
+            transform: transform,
+            qrFrame: qrFrame,
+            metadataFrame: metadataFrame
+        )
     }
 
     private var maximumRowsPerPage: Int {
         let availableHeight = Self.maximumPageHeight - topMargin - bottomMargin
-        return max(1, Int(floor((availableHeight + rowSpacing) / (cellHeight + rowSpacing))))
+        return max(
+            1,
+            Self.fitCount(
+                available: availableHeight,
+                item: labelSize.height,
+                spacing: verticalSpacing
+            )
+        )
+    }
+
+    private static func fitCount(available: CGFloat, item: CGFloat, spacing: CGFloat) -> Int {
+        guard available >= item else { return 0 }
+        return max(0, Int(floor((available + spacing) / (item + spacing))))
     }
 }

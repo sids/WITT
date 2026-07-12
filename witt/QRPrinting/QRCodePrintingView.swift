@@ -5,9 +5,7 @@ import UIKit
 struct QRCodePrintingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var labelCount = 48
-    @State private var paper: QRCodeSheetPaper = .a4
-    @State private var labelStyle: QRCodeSheetLabelStyle = .codeID
-    @State private var thermalConfiguration = QRCodeThermalLayoutConfiguration()
+    @State private var configuration = QRCodeSheetConfiguration()
     @State private var sharedFile: SharedPDF?
     @State private var errorMessage: String?
 
@@ -21,25 +19,46 @@ struct QRCodePrintingView: View {
                 }
 
                 Section("Paper") {
-                    Picker("Paper Size", selection: $paper) {
+                    Picker("Paper Size", selection: $configuration.paper) {
                         ForEach(QRCodeSheetPaper.allCases) { option in
                             Text(option.title).tag(option)
                         }
                     }
                     .pickerStyle(.segmented)
-                }
 
-                if paper == .thermal {
-                    thermalSettingsSection
-                }
-
-                Section("Label Style") {
-                    Picker("Label Style", selection: $labelStyle) {
-                        ForEach(QRCodeSheetLabelStyle.allCases) { option in
-                            Text(option.title).tag(option)
+                    if configuration.paper == .custom {
+                        Picker("Length", selection: $configuration.customPaperLength) {
+                            ForEach(QRCodePaperLength.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
                         }
+                        .pickerStyle(.segmented)
+
+                        millimeterField(
+                            "Paper Width",
+                            value: $configuration.customPaperWidthMillimeters
+                        )
+                        if configuration.customPaperLength == .fixed {
+                            millimeterField(
+                                "Paper Height",
+                                value: $configuration.customPaperHeightMillimeters
+                            )
+                        }
+                    } else if let size = configuration.paper.fixedSizeMillimeters {
+                        LabeledContent(
+                            "Dimensions",
+                            value: millimeterDimensions(width: size.width, height: size.height)
+                        )
                     }
-                    .pickerStyle(.segmented)
+                }
+
+                marginsSection
+                labelsSection
+
+                if !isSquareLabelSelection {
+                    Section("Rectangular Labels") {
+                        Toggle("Write-In Line", isOn: $configuration.includesWriteInLine)
+                    }
                 }
 
                 Section {
@@ -48,6 +67,7 @@ struct QRCodePrintingView: View {
                     } label: {
                         Label("Preview PDF", systemImage: "doc.text.magnifyingglass")
                     }
+                    .disabled(configuredLayout == nil)
                 }
             }
             .navigationTitle("Print QR Labels")
@@ -56,10 +76,6 @@ struct QRCodePrintingView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
-            }
-            .onChange(of: paper) { _, newPaper in
-                guard newPaper != .thermal else { return }
-                labelCount = min(60, max(6, Int(ceil(Double(labelCount) / 6)) * 6))
             }
         }
         .sheet(item: $sharedFile) { file in
@@ -79,55 +95,102 @@ struct QRCodePrintingView: View {
         }
     }
 
-    private var thermalSettingsSection: some View {
-        Section("Thermal Roll") {
-            Stepper(value: $thermalConfiguration.paperWidthMillimeters, in: 30...110, step: 1) {
-                millimeterContent("Paper Width", value: thermalConfiguration.paperWidthMillimeters)
-            }
-            Stepper(value: $thermalConfiguration.columns, in: 1...4) {
-                LabeledContent("QRs per Row", value: "\(thermalConfiguration.columns)")
-            }
-            Stepper(value: $thermalConfiguration.rowSpacingMillimeters, in: 0...20, step: 1) {
-                millimeterContent("Row Spacing", value: thermalConfiguration.rowSpacingMillimeters)
-            }
-            Stepper(value: $thermalConfiguration.columnSpacingMillimeters, in: 0...20, step: 1) {
-                millimeterContent("Column Spacing", value: thermalConfiguration.columnSpacingMillimeters)
-            }
-            Stepper(value: $thermalConfiguration.horizontalMarginMillimeters, in: 0...20, step: 1) {
-                millimeterContent("Horizontal Margins", value: thermalConfiguration.horizontalMarginMillimeters)
-            }
-            Stepper(value: $thermalConfiguration.topMarginMillimeters, in: 0...20, step: 1) {
-                millimeterContent("Top Margin", value: thermalConfiguration.topMarginMillimeters)
-            }
-            Stepper(value: $thermalConfiguration.bottomMarginMillimeters, in: 0...20, step: 1) {
-                millimeterContent("Bottom Margin", value: thermalConfiguration.bottomMarginMillimeters)
-            }
-            LabeledContent("Estimated QR Size", value: estimatedQRCodeSize)
+    private var marginsSection: some View {
+        Section("Paper Margins") {
+            millimeterField("Left", value: $configuration.leftMarginMillimeters)
+            millimeterField("Right", value: $configuration.rightMarginMillimeters)
+            millimeterField("Top", value: $configuration.topMarginMillimeters)
+            millimeterField("Bottom", value: $configuration.bottomMarginMillimeters)
         }
     }
 
-    private var labelCountRange: ClosedRange<Int> {
-        paper == .thermal ? 1...120 : 6...60
-    }
+    private var labelsSection: some View {
+        Section("Label Layout") {
+            millimeterField("Label Width", value: $configuration.labelWidthMillimeters)
+            millimeterField("Label Height", value: $configuration.labelHeightMillimeters)
+            millimeterField("Horizontal Gap", value: $configuration.horizontalSpacingMillimeters)
+            millimeterField("Vertical Gap", value: $configuration.verticalSpacingMillimeters)
 
-    private var labelCountStep: Int {
-        paper == .thermal ? 1 : 6
-    }
-
-    private var estimatedQRCodeSize: String {
-        guard let layout = try? QRCodeSheetLayout.thermal(configuration: thermalConfiguration) else {
-            return String(localized: "Invalid Settings")
+            if let layout = configuredLayout {
+                LabeledContent("Labels per Row", value: "\(layout.columns)")
+                if configuration.usesUnlimitedLength {
+                    LabeledContent(
+                        "Output Length",
+                        value: pointsAsMillimeters(
+                            layout.pageSize(at: 0, codeCount: labelCount).height
+                        )
+                    )
+                } else {
+                    LabeledContent("Labels per Page", value: "\(layout.codesPerPage)")
+                }
+                LabeledContent("QR Size", value: pointsAsMillimeters(layout.qrSide))
+            } else if let layoutErrorMessage {
+                Text(layoutErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
         }
-        return millimeters(layout.estimatedQRCodeSideMillimeters)
     }
 
-    private func millimeterContent(_ title: LocalizedStringKey, value: CGFloat) -> some View {
-        LabeledContent(title, value: millimeters(value))
+    private var labelCountRange: ClosedRange<Int> { 1...120 }
+
+    private var labelCountStep: Int { 1 }
+
+    private var configuredLayout: QRCodeSheetLayout? {
+        try? QRCodeSheetLayout(configuration: configuration)
     }
 
-    private func millimeters(_ value: CGFloat) -> String {
+    private var layoutErrorMessage: String? {
+        do {
+            _ = try QRCodeSheetLayout(configuration: configuration)
+            return nil
+        } catch {
+            return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private var isSquareLabelSelection: Bool {
+        abs(configuration.labelWidthMillimeters - configuration.labelHeightMillimeters) <= 0.1
+    }
+
+    private func millimeterField(
+        _ title: LocalizedStringKey,
+        value: Binding<CGFloat>
+    ) -> some View {
+        let numericValue = Binding<Double>(
+            get: { Double(value.wrappedValue) },
+            set: { value.wrappedValue = CGFloat($0) }
+        )
+
+        return LabeledContent(title) {
+            HStack(spacing: 4) {
+                TextField(
+                    "",
+                    value: numericValue,
+                    format: .number.precision(.fractionLength(0...1))
+                )
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 72)
+                Text("mm")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func pointsAsMillimeters(_ value: CGFloat) -> String {
+        formattedMillimeters(PDFMeasurement.millimeters(fromPoints: value))
+    }
+
+    private func formattedMillimeters(_ value: CGFloat) -> String {
         let number = Double(value).formatted(.number.precision(.fractionLength(0...1)))
         return String(localized: "\(number) mm")
+    }
+
+    private func millimeterDimensions(width: CGFloat, height: CGFloat) -> String {
+        let formattedWidth = Double(width).formatted(.number.precision(.fractionLength(0...1)))
+        let formattedHeight = Double(height).formatted(.number.precision(.fractionLength(0...1)))
+        return String(localized: "\(formattedWidth) × \(formattedHeight) mm")
     }
 
     @MainActor
@@ -135,15 +198,11 @@ struct QRCodePrintingView: View {
         do {
             let codes = try QRCodeSheetBatchGenerator(tokenGenerator: { try QRToken.generate() })
                 .generate(count: labelCount)
-            let layout = if paper == .thermal {
-                try QRCodeSheetLayout.thermal(configuration: thermalConfiguration)
-            } else {
-                QRCodeSheetLayout(paper: paper)
-            }
+            let layout = try QRCodeSheetLayout(configuration: configuration)
             let data = try QRCodeSheetPDFGenerator().generate(
                 codes: codes,
                 layout: layout,
-                labelStyle: labelStyle
+                includesWriteInLine: configuration.includesWriteInLine
             )
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("WITT-QR-Labels-\(UUID().uuidString).pdf")

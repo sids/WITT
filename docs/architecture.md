@@ -81,9 +81,9 @@ This is the MVP production candidate, not a temporary file cache. A hybrid paylo
 
 ### Printable PDFs
 
-The printing subsystem in [`QRPrinting`](../witt/QRPrinting) generates random, unique tokens and renders their WITT URLs without inserting unbound rows into Core Data. A4 and US Letter use fixed sheet geometry. Thermal Roll accepts width in millimeters, QRs per row, row/column spacing, and independent horizontal/top/bottom margins.
+The printing subsystem in [`QRPrinting`](../witt/QRPrinting) generates random, unique tokens and renders their WITT URLs without inserting unbound rows into Core Data. `QRCodeSheetConfiguration` unifies A4, US Letter, and Custom paper. Built-in papers provide fixed metric dimensions; Custom accepts a width and either fixed height or unlimited length. Independent paper-edge margins, exact label dimensions, and horizontal/vertical gaps determine the grid rather than a manually selected column count. The default configuration models a 100 mm continuous roll with four contiguous 25 × 25 mm square labels across.
 
-[`QRCodeSheetLayout`](../witt/QRPrinting/QRCodeSheetModels.swift) converts millimeters to 72-point PDF units, derives QR and cell dimensions, rejects nonpositive printable geometry, and enforces a minimum 20 mm QR side. Continuous-roll page height is based on actual rows; output is split before UIKit's 14,400-point page-height limit, including a correctly shortened final page. [`QRCodeSheetPDFGenerator`](../witt/QRPrinting/QRCodeSheetPDFGenerator.swift) uses Core Image error correction level M, adds a four-module white quiet zone, scales by an integer factor, and draws with interpolation disabled for crisp black-and-white output. Code-ID and write-in label styles are supported.
+[`QRCodeSheetLayout`](../witt/QRPrinting/QRCodeSheetModels.swift) converts millimeters to 72-point PDF units, derives rows and columns while preserving exact physical label frames, rejects nonpositive or nonfitting geometry, and enforces a minimum 20 mm QR side. Fixed paper retains its declared page size. Continuous output derives its height from the actual rows and splits before UIKit's 14,400-point page-height limit, including a correctly shortened final page. Portrait rectangular content is rotated within its physical label so the ID remains beside the QR. [`QRCodeSheetPDFGenerator`](../witt/QRPrinting/QRCodeSheetPDFGenerator.swift) uses Core Image error correction level M, adds a four-module white quiet zone, creates an integer-scaled high-resolution bitmap, and draws with interpolation disabled. Square labels omit all text; rectangular labels draw the eight-character ID beside the QR and optionally add a write-in line below it.
 
 [`QRCodePrintingView`](../witt/QRPrinting/QRCodePrintingView.swift) writes the generated PDF atomically to a temporary URL, previews it with Quick Look, and relies on the native preview share/print actions. The temporary file is removed when preview closes.
 
@@ -115,13 +115,13 @@ Creation and editing are routed through `ManagementRoute` and one-screen forms i
 
 ## Testing seams and baseline
 
-The `wittTests` target currently contains 132 simulator tests. The baseline covers:
+The `wittTests` target currently contains 134 simulator tests. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, and QR mutations;
 - managed-object runtime class mappings, build-4 schema hashes, controlled model-contract failures, and SQLite Container reopen compatibility;
 - QR token/URL parsing, resolution, routing, duplicate scanner payloads, and scanner state transitions;
-- sheet and Thermal Roll geometry, pagination, PDF dimensions, quiet zones, crisp rendering, and failure paths;
+- fixed-sheet and continuous-roll label geometry, physical margins/gaps, square and rectangular content rules, pagination, PDF dimensions, quiet zones, crisp rendering, and failure paths;
 - photo orientation, resizing, metadata stripping, thumbnail generation, and persistence;
 - AI protocol mocks, Responses-compatible request/response handling, configuration selection, and error mapping;
 - management preselection, AI suggestion application, archive facts, catalog presentation, and Place-sharing helpers.
@@ -137,6 +137,6 @@ The implemented app shell, repository, photo pipeline, scanner, QR printing, sha
 3. Put AI behind a WITT-owned relay or another short-lived credential mechanism. Never ship a long-lived provider API key in the app bundle. Select the production model, endpoint policy, retention/privacy disclosures, failure budget, and user-facing consent posture before enabling live labeling.
 4. Verify CloudKit production schema deployment, container/environment entitlements, push delivery, migration behavior, and App Store/TestFlight signing. The checked-in entitlement currently names the development push environment; release signing must resolve the production entitlement correctly.
 5. Run device coverage for camera permission transitions, QR focus/rotation/torch behavior, deep-link launch from a cold app, photo capture memory pressure, iPad presentation, physical A4/Letter printing, and representative thermal printers.
-6. Preserve the 132-test baseline and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
+6. Preserve the 134-test baseline and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
 
 These gates are validation and production-operations work, not a request to reopen settled domain boundaries. Place-rooted ownership, explicit Area/Container QR binding, provider-neutral AI, normalized photo inputs, and snapshot-based presentation remain the architectural constraints.

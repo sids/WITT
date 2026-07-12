@@ -15,7 +15,7 @@ struct QRCodeSheetPDFGenerator {
     func generate(
         codes: [PrintableQRCode],
         layout: QRCodeSheetLayout,
-        labelStyle: QRCodeSheetLabelStyle = .codeID
+        includesWriteInLine: Bool = false
     ) throws -> Data {
         guard !codes.isEmpty else { throw QRCodeSheetError.invalidCount }
 
@@ -34,48 +34,34 @@ struct QRCodeSheetPDFGenerator {
                 let pageEnd = min(pageStart + layout.codesPerPage, codes.count)
                 for absoluteIndex in pageStart..<pageEnd {
                     let pageLocalIndex = absoluteIndex - pageStart
-                    let qrFrame = layout.qrFrame(at: pageLocalIndex)
-                    guard bounds.contains(qrFrame),
-                          bounds.contains(layout.identifierFrame(at: pageLocalIndex)) else {
+                    let labelFrame = layout.labelFrame(at: pageLocalIndex)
+                    let contentLayout = layout.contentLayout(at: pageLocalIndex)
+                    guard bounds.insetBy(dx: -0.5, dy: -0.5).contains(labelFrame) else {
                         generationError = .invalidGeometry
                         return
                     }
-                    guard let image = imageGenerator(codes[absoluteIndex].url.absoluteString, qrFrame.width) else {
+                    guard let image = imageGenerator(
+                        codes[absoluteIndex].url.absoluteString,
+                        contentLayout.qrFrame.width
+                    ) else {
                         generationError = .imageGenerationFailed(index: absoluteIndex)
                         return
                     }
 
-                    let renderedSide = min(qrFrame.width, CGFloat(image.width))
-                    let renderedFrame = CGRect(
-                        x: qrFrame.midX - renderedSide / 2,
-                        y: qrFrame.midY - renderedSide / 2,
-                        width: renderedSide,
-                        height: renderedSide
-                    )
+                    context.cgContext.saveGState()
+                    context.cgContext.concatenate(contentLayout.transform)
                     context.cgContext.interpolationQuality = .none
-                    context.cgContext.draw(image, in: renderedFrame)
+                    context.cgContext.draw(image, in: contentLayout.qrFrame)
 
-                    let paragraph = NSMutableParagraphStyle()
-                    paragraph.alignment = .center
-                    paragraph.lineBreakMode = .byClipping
-                    let attributes: [NSAttributedString.Key: Any] = [
-                        .font: UIFont.monospacedSystemFont(ofSize: 10, weight: .medium),
-                        .foregroundColor: UIColor.black,
-                        .paragraphStyle: paragraph
-                    ]
-                    codes[absoluteIndex].identifier.draw(
-                        in: layout.identifierFrame(at: pageLocalIndex),
-                        withAttributes: attributes
-                    )
-                    if labelStyle == .blankLine {
-                        let frame = layout.identifierFrame(at: pageLocalIndex)
-                        let lineY = frame.maxY - 1
-                        context.cgContext.setStrokeColor(UIColor.black.cgColor)
-                        context.cgContext.setLineWidth(0.75)
-                        context.cgContext.move(to: CGPoint(x: frame.minX + 12, y: lineY))
-                        context.cgContext.addLine(to: CGPoint(x: frame.maxX - 12, y: lineY))
-                        context.cgContext.strokePath()
+                    if let metadataFrame = contentLayout.metadataFrame {
+                        drawIdentifier(
+                            codes[absoluteIndex].identifier,
+                            in: metadataFrame,
+                            includesWriteInLine: includesWriteInLine,
+                            context: context.cgContext
+                        )
                     }
+                    context.cgContext.restoreGState()
                 }
             }
         }
@@ -85,6 +71,49 @@ struct QRCodeSheetPDFGenerator {
             throw QRCodeSheetError.pdfGenerationFailed
         }
         return data
+    }
+
+    private func drawIdentifier(
+        _ identifier: String,
+        in metadataFrame: CGRect,
+        includesWriteInLine: Bool,
+        context: CGContext
+    ) {
+        let horizontalInset = min(4, metadataFrame.width * 0.06)
+        let contentFrame = metadataFrame.insetBy(dx: horizontalInset, dy: 0)
+        let maximumFontSize = contentFrame.width / (CGFloat(max(identifier.count, 1)) * 0.62)
+        let font = UIFont.monospacedSystemFont(
+            ofSize: min(10, max(6, maximumFontSize)),
+            weight: .medium
+        )
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byClipping
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.black,
+            .paragraphStyle: paragraph,
+        ]
+        let identifierY = includesWriteInLine
+            ? metadataFrame.minY + max(2, metadataFrame.height * 0.08)
+            : metadataFrame.midY - (font.lineHeight / 2)
+        identifier.draw(
+            in: CGRect(
+                x: contentFrame.minX,
+                y: identifierY,
+                width: contentFrame.width,
+                height: font.lineHeight + 1
+            ),
+            withAttributes: attributes
+        )
+
+        guard includesWriteInLine else { return }
+        let lineY = metadataFrame.maxY - max(5, metadataFrame.height * 0.2)
+        context.setStrokeColor(UIColor.black.cgColor)
+        context.setLineWidth(0.75)
+        context.move(to: CGPoint(x: contentFrame.minX, y: lineY))
+        context.addLine(to: CGPoint(x: contentFrame.maxX, y: lineY))
+        context.strokePath()
     }
 
     static func makeQRCode(payload: String, targetSide: CGFloat) -> CGImage? {
@@ -104,7 +133,8 @@ struct QRCodeSheetPDFGenerator {
         let padded = output
             .transformed(by: CGAffineTransform(translationX: quietZone, y: quietZone))
             .composited(over: CIImage(color: .white).cropped(to: paddedExtent))
-        let scale = max(1, floor(targetSide / padded.extent.width))
+        let targetPixels = targetSide * 4
+        let scale = max(1, floor(targetPixels / padded.extent.width))
         let scaled = padded.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         return CIContext(options: [.useSoftwareRenderer: false]).createCGImage(scaled, from: scaled.extent)
     }
