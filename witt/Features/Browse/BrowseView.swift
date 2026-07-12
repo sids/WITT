@@ -635,10 +635,18 @@ struct RoomDetailView: View {
 }
 
 private struct AreaDetailView: View {
+    private enum ContentSelection: String, CaseIterable, Identifiable {
+        case things = "Things"
+        case containers = "Containers"
+
+        var id: Self { self }
+    }
+
     @ObservedObject var store: CatalogStore
     let areaID: UUID
     let presentManagement: (ManagementRoute) -> Void
     @State private var showsQRScanner = false
+    @State private var contentSelection = ContentSelection.things
 
     var body: some View {
         Group {
@@ -652,11 +660,19 @@ private struct AreaDetailView: View {
                             .padding(.horizontal)
                             .padding(.bottom, 8)
                     }
+                    Picker("Contents", selection: $contentSelection) {
+                        ForEach(ContentSelection.allCases) { selection in
+                            Text(selection.rawValue).tag(selection)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                     List {
                         CatalogLocationSummary(photo: area.primaryPhoto, detail: nil)
                         let things = place.activeThings(in: .area(area.id))
                         let containers = place.activeContainers(inArea: area.id)
-                        Section("Things") {
+                        if contentSelection == .things {
                             TwoColumnBrowseGrid {
                                 ForEach(things) { thing in
                                     NavigationLink(value: BrowseRoute.thing(thing.id)) {
@@ -673,8 +689,7 @@ private struct AreaDetailView: View {
                                 .buttonStyle(.plain)
                             }
                             .browseGridListRow()
-                        }
-                        Section("Containers") {
+                        } else {
                             TwoColumnBrowseGrid {
                                 ForEach(containers) { container in
                                     NavigationLink(value: BrowseRoute.container(container.id)) {
@@ -977,7 +992,7 @@ private struct DashedCreateBorder: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 8)
             .stroke(
-                Color.secondary.opacity(0.55),
+                Color.accentColor,
                 style: StrokeStyle(lineWidth: 1, dash: [6, 4])
             )
             .accessibilityHidden(true)

@@ -70,7 +70,7 @@ Creation is contextual:
 - New Storage Area and Container forms can optionally scan an unused QR label. Their detail screens keep QR assignment in the ellipsis menu rather than showing QR status in the content layer.
 - Management forms support create, edit, same-Place move, photo replacement or removal, and archive with impact confirmation.
 
-Storage Area details appear as secondary, noninteractive text immediately beneath the screen title rather than inside a grouped row that resembles a button.
+Storage Area details appear as secondary, noninteractive text immediately beneath the screen title rather than inside a grouped row that resembles a button. A native segmented control below the details switches between Things and Containers, defaults to Things, and shows the matching collection and contextual New tile.
 
 Browse collections should make each hierarchy level recognizable at a glance:
 
@@ -79,6 +79,8 @@ Browse collections should make each hierarchy level recognizable at a glance:
 - Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right. New Storage Area is a full-size dashed row matching that list geometry.
 - Things use low-margin two-column square photo tiles with the name in a restrained translucent bottom overlay. New Thing is a matching dashed tile in the grid.
 - Containers use low-margin two-column square photo tiles with centered name and descendant Thing count in a restrained translucent overlay. New Container is a matching dashed tile in the grid.
+
+Every dashed creation outline uses the same system tint as the icon and text inside it.
 
 Counts include active Things nested anywhere beneath the displayed Room, Storage Area, or Container. Missing photos use clear system-image fallbacks. These layouts belong to Browse; Find remains optimized for scanning search results.
 

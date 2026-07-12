@@ -26,6 +26,8 @@ Workflow:
 - [x] FB-019 - Sid, July 12, 2026, build `1.0 (4)`: Fix Room navigation selecting a stale saved destination. Explicit Room taps now atomically replace a restored path, while launch restoration remains intact. Verified by three regression tests and by restoring a deep Garage path, backing to Home, selecting Home Office, and returning to Home.
 - [x] FB-020 - Sid, July 12, 2026, build `1.0 (4)`: Make New Storage Area a full Storage Area list-sized action row with a restrained dashed border, in both empty and populated Room states. Verified on populated Garage and empty Home Office screens.
 - [x] FB-021 - Sid, July 12, 2026, build `1.0 (4)`: Tighten the horizontal margins for Thing and Container grids. Put New Thing and New Container inside their corresponding two-column grids as square dashed-border tiles instead of a separate New menu, while preserving the same creation destinations. Verified on populated and empty Storage Area and Container states.
+- [x] FB-022 - Sid, July 12, 2026, build `1.0 (4)`: Use the same system tint for dashed creation borders as the icon and text inside them, across New Room, Storage Area, Thing, and Container controls. Verified the shared tint treatment on New Storage Area, Thing, and Container controls; all use the same shared border component.
+- [x] FB-023 - Sid, July 12, 2026, build `1.0 (4)`: Add a native Things/Containers segmented control to the Storage Area screen. The control defaults to Things and shows only the selected collection and matching contextual New tile. Verified populated Things and Containers plus an empty Storage Area on iPhone.
 
 ## P0 - Release Gates
 
