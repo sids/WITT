@@ -188,6 +188,7 @@ struct BrowseView: View {
                             store: store,
                             place: selectedPlace,
                             onSharePlace: onSharePlace,
+                            onPrintQRCodes: onPrintQRCodes,
                             onSelectRoom: selectRoom,
                             presentManagement: presentManagement
                         )
@@ -291,7 +292,6 @@ struct BrowseView: View {
                 Button("New Place", systemImage: "plus") {
                     presentManagement(.createPlace)
                 }
-                Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
             }
         } label: {
             Image(systemName: "mappin.and.ellipse")
@@ -427,6 +427,7 @@ private struct PlaceListView: View {
     @ObservedObject var store: CatalogStore
     let place: PlaceSnapshot
     let onSharePlace: (UUID) -> Void
+    let onPrintQRCodes: () -> Void
     let onSelectRoom: (UUID) -> Void
     let presentManagement: (ManagementRoute) -> Void
 
@@ -499,6 +500,8 @@ private struct PlaceListView: View {
                     Button("Share Place", systemImage: "person.crop.circle.badge.plus") {
                         onSharePlace(place.id)
                     }
+                    Divider()
+                    Button("Print QR Labels", systemImage: "qrcode", action: onPrintQRCodes)
                 }
                 .labelStyle(.iconOnly)
             }
