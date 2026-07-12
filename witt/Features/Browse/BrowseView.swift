@@ -619,8 +619,12 @@ struct RoomDetailView: View {
                 .navigationTitle(room.name)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Edit", systemImage: "pencil") { presentManagement(.editRoom(room.id)) }
-                            .labelStyle(.iconOnly)
+                        Menu("Room Actions", systemImage: "ellipsis") {
+                            Button("Edit Room", systemImage: "pencil") {
+                                presentManagement(.editRoom(room.id))
+                            }
+                        }
+                        .labelStyle(.iconOnly)
                     }
                 }
             } else {
