@@ -477,7 +477,7 @@ private struct PlaceListView: View {
 
                         newRoomButton(placeID: place.id)
                     }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 1, bottom: 8, trailing: 1))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
@@ -613,7 +613,7 @@ struct RoomDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .listRowInsets(
-                            EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+                            EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
                         )
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -893,7 +893,7 @@ private struct TwoColumnBrowseGrid<Content: View>: View {
 private struct BrowseGridListRowModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+            .listRowInsets(EdgeInsets(top: 8, leading: 1, bottom: 8, trailing: 1))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
     }
@@ -979,104 +979,58 @@ private struct StorageAreaRow: View {
 private struct NewStorageAreaRow: View {
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "plus")
-                .font(.title2)
-                .frame(width: 30)
-                .accessibilityHidden(true)
             Text("New Storage Area")
                 .font(.headline)
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "plus")
+                .font(.title2)
+                .frame(width: 64, height: 52)
+                .accessibilityHidden(true)
         }
         .foregroundStyle(.tint)
         .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
         .overlay { DashedCreateBorder() }
         .contentShape(.rect)
     }
 }
 
 private struct DashedCreateBorder: View {
-    private let cornerRadius: CGFloat = 8
-    private let lineWidth: CGFloat = 1
-
     var body: some View {
-        Canvas { context, size in
-            context.stroke(
-                sidePath(in: size),
-                with: .color(Color.accentColor),
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round,
-                    dash: [6, 4]
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(
+                    Color.accentColor,
+                    style: StrokeStyle(
+                        lineWidth: 1,
+                        lineCap: .round,
+                        lineJoin: .round,
+                        dash: [6, 4]
+                    )
                 )
-            )
-            context.stroke(
-                cornerPath(in: size),
-                with: .color(Color.accentColor),
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round,
-                    lineJoin: .round
-                )
-            )
+
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.accentColor, lineWidth: 1)
+                .mask { DashedCreateCornerMask() }
         }
         .accessibilityHidden(true)
     }
+}
 
-    private func sidePath(in size: CGSize) -> Path {
-        let (rect, radius) = drawingGeometry(in: size)
-
-        return Path { path in
-            path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
-
-            path.move(to: CGPoint(x: rect.maxX, y: rect.minY + radius))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-
-            path.move(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
-
-            path.move(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+private struct DashedCreateCornerMask: View {
+    var body: some View {
+        ZStack {
+            corner(alignment: .topLeading)
+            corner(alignment: .topTrailing)
+            corner(alignment: .bottomLeading)
+            corner(alignment: .bottomTrailing)
         }
     }
 
-    private func cornerPath(in size: CGSize) -> Path {
-        let (rect, radius) = drawingGeometry(in: size)
-        // The shoulders keep these short corner paths from being culled by the iOS renderer.
-        let shoulder: CGFloat = 10
-        let shallow = radius * 0.3826834
-        let diagonal = radius * 0.7071068
-        let deep = radius * 0.9238795
-        let corners: [(center: CGPoint, xInterior: CGFloat, yInterior: CGFloat)] = [
-            (CGPoint(x: rect.minX + radius, y: rect.minY + radius), 1, 1),
-            (CGPoint(x: rect.maxX - radius, y: rect.minY + radius), -1, 1),
-            (CGPoint(x: rect.maxX - radius, y: rect.maxY - radius), -1, -1),
-            (CGPoint(x: rect.minX + radius, y: rect.maxY - radius), 1, -1),
-        ]
-
-        return Path { path in
-            for corner in corners {
-                let center = corner.center
-                let x = corner.xInterior
-                let y = corner.yInterior
-
-                path.move(to: CGPoint(x: center.x + (x * shoulder), y: center.y - (y * radius)))
-                path.addLine(to: CGPoint(x: center.x, y: center.y - (y * radius)))
-                path.addLine(to: CGPoint(x: center.x - (x * shallow), y: center.y - (y * deep)))
-                path.addLine(to: CGPoint(x: center.x - (x * diagonal), y: center.y - (y * diagonal)))
-                path.addLine(to: CGPoint(x: center.x - (x * deep), y: center.y - (y * shallow)))
-                path.addLine(to: CGPoint(x: center.x - (x * radius), y: center.y))
-                path.addLine(to: CGPoint(x: center.x - (x * radius), y: center.y + (y * shoulder)))
-            }
-        }
-    }
-
-    private func drawingGeometry(in size: CGSize) -> (CGRect, CGFloat) {
-        let inset = lineWidth * 1.5
-        let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-        let radius = min(cornerRadius - (lineWidth / 2), rect.width / 2, rect.height / 2)
-        return (rect, radius)
+    private func corner(alignment: Alignment) -> some View {
+        Color.white
+            .frame(width: 16, height: 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
     }
 }
 
