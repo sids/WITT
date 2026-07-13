@@ -76,7 +76,7 @@ Browse collections should make each hierarchy level recognizable at a glance:
 
 - Rooms use two-column landscape tiles with a left icon, a two-line name, and the total number of descendant Things.
 - New Room is a matching dashed tile inside the Room grid; when it is the only tile, it remains one column wide and centered.
-- Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right. New Storage Area is a full-size dashed row matching that list geometry.
+- Storage Areas use native list rows with a larger name, smaller descendant Thing count, and photo or cabinet fallback on the right. When no Storage Areas exist, New Storage Area is a standalone full-size row with a fully dashed rounded outline. When the list is populated, it becomes the attached final row: no gap or top border, dashed sides and bottom, and only the bottom corners rounded.
 - Things use low-margin two-column square photo tiles with the name in a restrained translucent bottom overlay. New Thing is a matching dashed tile in the grid.
 - Containers use low-margin two-column square photo tiles with centered name and descendant Thing count in a restrained translucent overlay. New Container is a matching dashed tile in the grid.
 

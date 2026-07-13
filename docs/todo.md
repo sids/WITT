@@ -1,6 +1,6 @@
 # WITT Todo
 
-Updated July 12, 2026.
+Updated July 13, 2026.
 
 This is the canonical source of truth for actionable WITT work. New TestFlight feedback lands in the inbox before implementation starts.
 
@@ -36,6 +36,7 @@ Workflow:
 - [x] FB-029 - Sid, July 12, 2026, requested while build `1.0 (6)` was processing: Accept any non-empty QR-code payload for lookup and attachment instead of requiring a canonical `witt://` URL. Arbitrary payloads now preserve exact identity; valid generated WITT links unwrap to legacy raw-token rows; external WITT deep links remain strict; known/unknown routing, create-and-bind, replacement, and conflict protection all use the generalized identity. WITT-generated printable labels remain versioned `witt://` links, and attempting to construct one from an arbitrary payload returns a typed error rather than crashing. Verified by focused QR/repository/printing suites, then all 145 simulator tests in Debug and Release-optimized configurations with zero failures, skips, or warnings.
 - [ ] FB-030 - Sid, July 12, 2026: Rename the App Store-facing app from `WITT: Where Is The Thing?` to match the new expansion, `WITT: Where Is That Thing?`. Apple rejected the exact requested name because it is already used by another account. Choose an available variant, update the `en-US` App Info localization, and verify the App Store Connect record while keeping the on-device icon label `WITT`.
 - [x] FB-031 - Sid, July 12, 2026, build `1.0 (6)`: Repaired the dashed New Storage Area, New Thing, and New Container controls. The shared border now uses one continuous dashed system rounded rectangle, reinforces the four corner regions with the same native rounded geometry, and keeps grid content one point inside the List clipping boundary so no corner or adjoining edge disappears. New Storage Area retains a full Storage Area-row footprint, including its trailing media column, with deliberate vertical and horizontal separation from real rows. Verified populated Storage Area and Container states plus the empty Thing state in light and dark appearance on an iOS 26 iPhone, the empty state on an iOS 26 iPad, and all 145 tests in Debug and Release-optimized configurations with zero failures or skips; review screenshots were shared with Sid.
+- [x] FB-032 - Sid, July 13, 2026, build `1.0 (6)`: New Storage Area now has two distinct treatments. An empty Room retains the standalone button with a fully dashed rounded outline. In a populated Room, the action is the attached final list row with no gap or top border, dashed side and bottom borders, and only the bottom corners rounded. Verified both states in light and dark appearance on an iOS 26 iPhone, removed the temporary empty-Room fixture afterward, and passed all 145 tests in Debug and Release-optimized configurations with zero failures or skips; review screenshots were shared with Sid.
 
 ## P0 - Release Gates
 

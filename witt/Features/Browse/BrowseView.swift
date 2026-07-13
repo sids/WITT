@@ -609,11 +609,13 @@ struct RoomDetailView: View {
                         Button {
                             presentManagement(.createArea(roomID: room.id))
                         } label: {
-                            NewStorageAreaRow()
+                            NewStorageAreaRow(continuesList: !areas.isEmpty)
                         }
                         .buttonStyle(.plain)
                         .listRowInsets(
-                            EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
+                            areas.isEmpty
+                                ? EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
+                                : EdgeInsets()
                         )
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -977,6 +979,8 @@ private struct StorageAreaRow: View {
 }
 
 private struct NewStorageAreaRow: View {
+    let continuesList: Bool
+
     var body: some View {
         HStack(spacing: 12) {
             Text("New Storage Area")
@@ -990,8 +994,73 @@ private struct NewStorageAreaRow: View {
         .foregroundStyle(.tint)
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-        .overlay { DashedCreateBorder() }
+        .overlay {
+            if continuesList {
+                BottomDashedCreateBorder()
+            } else {
+                DashedCreateBorder()
+            }
+        }
         .contentShape(.rect)
+    }
+}
+
+private struct BottomDashedCreateBorder: View {
+    var body: some View {
+        ZStack {
+            BottomRoundedCreateBorderShape()
+                .stroke(
+                    Color.accentColor,
+                    style: StrokeStyle(
+                        lineWidth: 1,
+                        lineCap: .round,
+                        lineJoin: .round,
+                        dash: [6, 4]
+                    )
+                )
+
+            BottomRoundedCreateBorderShape()
+                .stroke(Color.accentColor, lineWidth: 1)
+                .mask { BottomDashedCreateCornerMask() }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct BottomRoundedCreateBorderShape: Shape {
+    func path(in bounds: CGRect) -> Path {
+        let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let radius = min(8, rect.width / 2, rect.height / 2)
+        var path = Path()
+
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.maxY - radius),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return path
+    }
+}
+
+private struct BottomDashedCreateCornerMask: View {
+    var body: some View {
+        ZStack {
+            corner(alignment: .bottomLeading)
+            corner(alignment: .bottomTrailing)
+        }
+    }
+
+    private func corner(alignment: Alignment) -> some View {
+        Color.white
+            .frame(width: 16, height: 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
     }
 }
 
