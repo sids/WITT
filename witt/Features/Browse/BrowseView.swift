@@ -1011,7 +1011,7 @@ private struct NewStorageAreaRow: View {
 private struct BottomDashedCreateBorder: View {
     var body: some View {
         ZStack {
-            BottomDashedCreateEdgesShape()
+            BottomDashedCreateBorderShape()
                 .stroke(
                     Color.accentColor,
                     style: StrokeStyle(
@@ -1022,72 +1022,50 @@ private struct BottomDashedCreateBorder: View {
                     )
                 )
 
-            BottomCreateCornerArcsShape()
-                .stroke(
-                    Color.accentColor,
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
+            BottomDashedCreateBorderShape()
+                .stroke(Color.accentColor, lineWidth: 1)
+                .mask { BottomCreateCornerMask() }
         }
         .accessibilityHidden(true)
     }
 }
 
-private struct BottomDashedCreateEdgesShape: Shape {
+private struct BottomDashedCreateBorderShape: Shape {
     func path(in bounds: CGRect) -> Path {
-        let (rect, radius) = populatedCreateBorderGeometry(in: bounds, inset: 1.5)
+        let lineInset: CGFloat = 4
+        let rect = bounds.insetBy(dx: lineInset, dy: lineInset)
+        let radius = max(
+            0,
+            min(20, bounds.width / 2, bounds.height / 2) - lineInset
+        )
         var path = Path()
 
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-        path.move(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
         path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
-        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.maxY - radius),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         return path
     }
 }
 
-private struct BottomCreateCornerArcsShape: Shape {
-    func path(in bounds: CGRect) -> Path {
-        let (edgeRect, edgeRadius) = populatedCreateBorderGeometry(in: bounds, inset: 1.5)
-        let (arcRect, arcRadius) = populatedCreateBorderGeometry(in: bounds, inset: 4)
-        var path = Path()
-
-        path.move(to: CGPoint(x: edgeRect.minX, y: edgeRect.maxY - edgeRadius))
-        path.addLine(to: CGPoint(x: arcRect.minX, y: arcRect.maxY - arcRadius))
-        path.addQuadCurve(
-            to: CGPoint(x: arcRect.minX + arcRadius, y: arcRect.maxY),
-            control: CGPoint(x: arcRect.minX, y: arcRect.maxY)
-        )
-        path.addLine(to: CGPoint(x: edgeRect.minX + edgeRadius, y: edgeRect.maxY))
-
-        path.move(to: CGPoint(x: edgeRect.maxX - edgeRadius, y: edgeRect.maxY))
-        path.addLine(to: CGPoint(x: arcRect.maxX - arcRadius, y: arcRect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: arcRect.maxX, y: arcRect.maxY - arcRadius),
-            control: CGPoint(x: arcRect.maxX, y: arcRect.maxY)
-        )
-        path.addLine(to: CGPoint(x: edgeRect.maxX, y: edgeRect.maxY - edgeRadius))
-        return path
+private struct BottomCreateCornerMask: View {
+    var body: some View {
+        HStack(spacing: 0) {
+            Color.white.frame(width: 21)
+            Spacer(minLength: 0)
+            Color.white.frame(width: 21)
+        }
+        .frame(height: 21)
+        .frame(maxHeight: .infinity, alignment: .bottom)
     }
-}
-
-private func populatedCreateBorderGeometry(
-    in bounds: CGRect,
-    inset: CGFloat
-) -> (CGRect, CGFloat) {
-    let nativeCornerRadius = min(20, bounds.width / 2, bounds.height / 2)
-    let rect = CGRect(
-        x: bounds.minX + inset,
-        y: bounds.minY + 0.5,
-        width: bounds.width - (inset * 2),
-        height: bounds.height - inset - 0.5
-    )
-    return (rect, max(0, nativeCornerRadius - inset))
 }
 
 private struct DashedCreateBorder: View {
