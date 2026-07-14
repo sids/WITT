@@ -1032,7 +1032,7 @@ private struct BottomDashedCreateBorder: View {
                 .mask { BottomCreateBorderMask() }
 
             borderShape
-                .strokeBorder(Color.accentColor, lineWidth: 1)
+                .strokeBorder(Color.accentColor, lineWidth: 1.5)
                 .mask { BottomCreateCornerMask() }
         }
         .accessibilityHidden(true)
