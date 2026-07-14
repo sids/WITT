@@ -1009,10 +1009,18 @@ private struct NewStorageAreaRow: View {
 }
 
 private struct BottomDashedCreateBorder: View {
+    private let borderShape = UnevenRoundedRectangle(
+        cornerRadii: RectangleCornerRadii(
+            bottomLeading: 24,
+            bottomTrailing: 24
+        ),
+        style: .circular
+    )
+
     var body: some View {
         ZStack {
-            BottomDashedCreateBorderShape()
-                .stroke(
+            borderShape
+                .strokeBorder(
                     Color.accentColor,
                     style: StrokeStyle(
                         lineWidth: 1,
@@ -1021,49 +1029,31 @@ private struct BottomDashedCreateBorder: View {
                         dash: [6, 4]
                     )
                 )
+                .mask { BottomCreateBorderMask() }
 
-            BottomDashedCreateBorderShape()
-                .stroke(Color.accentColor, lineWidth: 1)
+            borderShape
+                .strokeBorder(Color.accentColor, lineWidth: 1)
                 .mask { BottomCreateCornerMask() }
         }
         .accessibilityHidden(true)
     }
 }
 
-private struct BottomDashedCreateBorderShape: Shape {
-    func path(in bounds: CGRect) -> Path {
-        let lineInset: CGFloat = 4
-        let rect = bounds.insetBy(dx: lineInset, dy: lineInset)
-        let radius = max(
-            0,
-            min(20, bounds.width / 2, bounds.height / 2) - lineInset
-        )
-        var path = Path()
-
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.maxY - radius),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        return path
+private struct BottomCreateBorderMask: View {
+    var body: some View {
+        Color.white
+            .padding(.top, 1)
     }
 }
 
 private struct BottomCreateCornerMask: View {
     var body: some View {
         HStack(spacing: 0) {
-            Color.white.frame(width: 21)
+            Color.white.frame(width: 32)
             Spacer(minLength: 0)
-            Color.white.frame(width: 21)
+            Color.white.frame(width: 32)
         }
-        .frame(height: 21)
+        .frame(height: 32)
         .frame(maxHeight: .infinity, alignment: .bottom)
     }
 }
