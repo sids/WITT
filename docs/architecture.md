@@ -123,16 +123,16 @@ AI remains behind `ThingPhotoLabelingService`. The Responses-compatible adapter 
 
 ## Testing seams and baseline
 
-The `wittTests` target currently passes 171 tests in Debug and 167 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
+The `wittTests` target currently passes 184 tests in Debug and 180 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, QR mutations, repair consolidation, and healthy-takeover refusal;
 - managed-object runtime class mappings, build-4 schema hashes, controlled model-contract failures, and SQLite Container reopen compatibility;
-- QR token/URL parsing, resolution, repair routing, duplicate-row detection, assignment decisions, duplicate scanner payloads, scanner state transitions, and denied/restricted authorization recovery;
+- QR token/URL parsing, read-only resolution with inert legacy scan timestamps, repair routing, duplicate-row detection, assignment decisions, duplicate scanner payloads, scanner state transitions, and denied/restricted authorization recovery;
 - fixed-sheet and continuous-roll label geometry, physical margins/gaps, square and rectangular content rules, pagination, PDF dimensions, quiet zones, crisp rendering, and failure paths;
-- camera authorization mapping and recovery policy, plus photo orientation, resizing, metadata stripping, thumbnail generation, and persistence;
-- AI protocol mocks, Responses-compatible request/response handling, configuration selection, and error mapping;
-- management preselection, AI suggestion application, post-save dismissal handoffs, exact destination reconstruction, archive facts, catalog presentation, and Place-sharing helpers.
+- camera authorization mapping and recovery policy, plus photo orientation, resizing, metadata stripping, thumbnail generation, persistence, and picker lifecycle cancellation;
+- AI protocol mocks, Responses-compatible request/response handling, configuration selection, error mapping, relay transport safeguards, and deterministic evaluation scoring;
+- management preselection, AI suggestion application, post-save dismissal handoffs, exact destination reconstruction, archive facts, adaptive catalog presentation, and Place-sharing helpers.
 
 Primary seams are `CatalogRepository`, `QRCodeResolving`, `ThingPhotoLabelingService`, `PhotoNormalizer`, QR token/image generator closures, pure layout/validation types, in-memory `PersistenceController`, and immutable snapshots. Hardware camera behavior, CloudKit service behavior, UIKit sharing UI, and true multi-account synchronization require device or integration testing beyond this unit baseline.
 
@@ -145,6 +145,6 @@ The implemented app shell, repository, photo pipeline, scanner, QR printing, sha
 3. Put AI behind a WITT-owned relay or another short-lived credential mechanism. Never ship a long-lived provider API key in the app bundle. Select the production model, endpoint policy, retention/privacy disclosures, failure budget, and user-facing consent posture before enabling live labeling.
 4. Keep future CloudKit model changes additive and repeat schema initialization/deployment verification. Continue validating push delivery and migration behavior; build 7 signing and the current production schema are verified.
 5. Run device coverage for camera permission transitions, QR focus/rotation/torch behavior, deep-link launch from a cold app, photo capture memory pressure, iPad presentation, physical A4/Letter printing, and representative thermal printers.
-6. Preserve the 171-test Debug and 167-test Release-optimized baselines and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
+6. Preserve the 184-test Debug and 180-test Release-optimized baselines and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
 
 These gates are validation and production-operations work, not a request to reopen settled domain boundaries. Place-rooted ownership, explicit Area/Container QR binding, provider-neutral AI, normalized photo inputs, and snapshot-based presentation remain the architectural constraints.

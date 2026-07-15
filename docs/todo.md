@@ -123,6 +123,7 @@ Workflow:
   - [ ] Repeat full-resolution camera and iCloud-library ingestion on physical devices, including dismiss/reopen during loading, memory warnings, sustained sessions, and thermal pressure; simulator tooling could not produce a trustworthy leak graph.
 - [x] QR-003 - Retire `QRCode.lastScannedAt` from runtime behavior while retaining the optional deployed model attribute for additive CloudKit compatibility. QR resolution stays read-only and preserves legacy values without creating scan-history writes. Verified July 15, 2026 with 47 focused repository and persistence tests.
 - [ ] TEST-001 - Add focused regression tests with each feedback fix and keep the full simulator suite green.
+  - [x] July 15 autonomous hardening checkpoint: 184 Debug and 180 Release-optimized tests passed with zero failures, skips, warnings, or errors; a clean iOS 26 simulator build installed, launched, and remained running without runtime warnings.
 
 ## P2 - App Store Release
 
