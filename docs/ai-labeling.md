@@ -18,6 +18,8 @@ Relevant implementation:
 - `witt/AI/ThingPhotoLabelingService.swift`
 - `witt/AI/ThingPhotoLabelingServices.swift`
 - `witt/AI/OpenAICompatibleThingPhotoLabelingService.swift`
+- `witt/AI/ThingPhotoLabelingRelayService.swift`
+- `witt/AI/ThingPhotoLabelingEvaluation.swift`
 - `witt/App/ThingPhotoLabelingEnvironment.swift`
 
 ## Runtime Configuration
@@ -52,8 +54,10 @@ A complete endpoint/model configuration selects the remote service. Debug builds
 
 ## Production Boundary
 
-The adapter and tests are integrated, but live AI remains disabled in release until WITT has a relay or short-lived credential strategy, a chosen production model/endpoint, spend and rate controls, operational monitoring, a privacy disclosure, and a representative household-photo evaluation.
+The direct adapter and tests are integrated. An unwired production-preparation client now defines a provider-neutral WITT relay contract with short-lived credential checks, zero-retention request intent, no-cache/no-cookie transport, redirect rejection, correlated and bounded structured responses, and a deterministic evaluation scorer. The committed scorer fixture contains synthetic observations and opaque references; it is not the real consented household-photo corpus and does not activate live AI.
+
+Live AI remains disabled in release until WITT implements and operates the relay/auth service, chooses a production model, approves provider retention terms and user disclosure, configures spend/rate/monitoring controls, builds the real evaluation corpus, and passes the release gates in [ai-production.md](ai-production.md).
 
 Active production work is tracked only in [todo.md](todo.md) under `AI-001` and `AI-002`.
 
-The focused AI transport/configuration suite has 17 passing tests. The full app baseline is recorded in [status.md](status.md).
+The full verification baseline is recorded in [status.md](status.md).

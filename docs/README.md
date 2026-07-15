@@ -7,6 +7,8 @@ This directory is the canonical home for WITT product, technical, planning, and 
 - [Product](product.md) - product purpose, vocabulary, workflows, scope, and UX direction.
 - [Architecture](architecture.md) - current domain, persistence, sharing, photo, QR, and presentation architecture.
 - [AI Labeling](ai-labeling.md) - provider-neutral labeling contract, runtime behavior, privacy, and production boundary.
+- [AI Production Preparation](ai-production.md) - unwired relay contract, mobile-auth boundary, privacy/operations controls, evaluation gates, and rollout plan.
+- [Product Decision Recommendations](product-decisions.md) - version 1 recommendations awaiting product-manager acceptance.
 - [Todo](todo.md) - the only live backlog and TestFlight feedback inbox.
 - [Status](status.md) - concise implementation snapshot and verification baseline.
 - [Release](release.md) - App Store Connect facts and repeatable TestFlight/App Store release process.

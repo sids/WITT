@@ -60,6 +60,8 @@ Workflow:
   - [ ] If transfer is unreliable, design a hybrid `PhotoAsset` metadata + local files + shared CloudKit asset migration.
   - [ ] If reliable but slow, tune original/thumbnail dimensions and storage policy.
 - [ ] AI-001 - Activate production AI without putting a long-lived provider key in the app.
+  - [x] Defined the provider-neutral relay, App Attest/short-lived credential boundary, privacy/retention controls, limits, monitoring, evaluation gates, staged rollout, and rollback plan in [ai-production.md](ai-production.md).
+  - [x] Implemented an unwired HTTPS relay client with ephemeral no-cache/no-cookie transport, redirect rejection, credential and response bounds, zero-retention request intent, request correlation, and deterministic scorer/fixture coverage. No runtime path, provider, credential, or live photo corpus was added.
   - [ ] Choose and implement a WITT-owned relay or secure short-lived credential strategy.
   - [ ] Choose the production model and Responses-compatible endpoint.
   - [ ] Decide and publish user-facing photo-processing, retention, and privacy disclosure.
@@ -103,10 +105,15 @@ Workflow:
   - [x] Existing-target and create-and-attach repairs atomically consolidate all damaged/duplicate rows into exactly one chosen binding.
   - [x] Verified July 15, 2026 with 171 Debug tests, 167 Release-optimized tests, clean iOS 26 Debug build/run, and conflict/list plus no-target/create repair screenshots.
 - [ ] SEARCH-001 - Decide the scope and prominence of duplicate-Thing detection; implement only if it materially helps cataloging.
+  - [x] Prepared the version 1 recommendation to defer automatic detection and measure accidental duplicates during real cataloging; awaiting Sid's acceptance in [product-decisions.md](product-decisions.md).
 - [ ] AI-002 - Decide whether AI confidence is user-visible or only used internally to flag suggestions for review.
+  - [x] Prepared the version 1 recommendation to keep uncalibrated confidence internal; awaiting Sid's acceptance in [product-decisions.md](product-decisions.md).
 - [ ] THING-001 - Decide whether quantity belongs in first-release Thing capture.
+  - [x] Prepared the version 1 recommendation to omit stock-style quantity; awaiting Sid's acceptance in [product-decisions.md](product-decisions.md).
 - [ ] PLACE-001 - Decide whether direct-to-Room Thing placement is a normal path or a fallback when no Storage Area/Container applies.
+  - [x] Prepared the version 1 recommendation to retain it as a supported fallback without promoting a Room-level New Thing action; awaiting Sid's acceptance in [product-decisions.md](product-decisions.md).
 - [ ] SHARE-001 - After real shared-Place use, confirm whether simple last-writer conflict behavior is acceptable or needs user-facing conflict handling.
+  - [x] Prepared a provisional simple-convergence position and explicit spike failure criteria in [product-decisions.md](product-decisions.md); final acceptance still depends on the two-account spike.
 
 ## P1 - Engineering And Operations
 
