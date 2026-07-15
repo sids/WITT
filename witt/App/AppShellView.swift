@@ -7,6 +7,8 @@ struct AppShellView: View {
     @State private var isPresentingScanner = false
     @State private var pendingScannerOutcome: ScannerOutcome?
     @State private var pendingDemo: ScanDemo?
+    @State private var thingPostSaveDismissal = ThingPostSaveDismissalState()
+    @State private var browseNavigationRequest: BrowseRoute?
     @State private var sharingSheet: PlaceSharingSheet?
     @State private var isPrintingQRCodes = false
     @State private var deepLinkAlert: DeepLinkAlert?
@@ -28,7 +30,8 @@ struct AppShellView: View {
             store: store,
             onSharePlace: sharePlace,
             onPrintQRCodes: { isPrintingQRCodes = true },
-            onScan: { isPresentingScanner = true }
+            onScan: { isPresentingScanner = true },
+            navigationRequest: $browseNavigationRequest
         )
         .fullScreenCover(isPresented: $isPresentingScanner, onDismiss: finishScannerDismissal) {
             ScanView(
@@ -37,14 +40,14 @@ struct AppShellView: View {
                 onPayload: handleScannerPayload
             )
         }
-        .sheet(item: $presentedScan) { presentation in
+        .sheet(item: $presentedScan, onDismiss: finishThingFlowDismissal) { presentation in
             NavigationStack {
                 switch presentation.flow {
                 case .capture(let destination):
                     CaptureThingView(
                         store: store,
                         destination: destination,
-                        onSaved: closeScanFlow
+                        onPostSaveHandoff: dismissScanFlow(after:)
                     )
                 case .attach(let token):
                     AttachQRCodeView(
@@ -53,11 +56,11 @@ struct AppShellView: View {
                         onAttached: closeScanFlow
                     )
                 case .review(let destination, let photo):
-                    ReviewThingView(
+                    ReviewThingSessionView(
                         store: store,
                         destination: destination,
                         photo: photo,
-                        onSaved: closeScanFlow
+                        onPostSaveHandoff: dismissScanFlow(after:)
                     )
                 case .createAttach(let token):
                     CreateAndAttachView(
@@ -205,6 +208,23 @@ struct AppShellView: View {
 
     private func closeScanFlow() {
         presentedScan = nil
+    }
+
+    private func dismissScanFlow(after handoff: ThingPostSaveHandoff) {
+        thingPostSaveDismissal.begin(handoff)
+        presentedScan = nil
+    }
+
+    private func finishThingFlowDismissal() {
+        guard let handoff = thingPostSaveDismissal.finish() else { return }
+        switch handoff {
+        case .scanNext:
+            isPresentingScanner = true
+        case .viewThing(let thingID):
+            browseNavigationRequest = .thing(thingID)
+        case .done:
+            break
+        }
     }
 
     private func sharePlace(_ placeID: UUID) {

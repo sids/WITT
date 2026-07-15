@@ -181,9 +181,9 @@ final class CatalogStore: ObservableObject {
         photo: NormalizedPhoto?,
         to destination: ThingDestination,
         nameSource: String
-    ) async -> Bool {
+    ) async -> ThingSnapshot? {
         do {
-            _ = try await repository.saveThing(
+            let saved = try await repository.saveThing(
                 ReviewedThingDraft(
                     name: name,
                     keywords: keywords,
@@ -194,10 +194,10 @@ final class CatalogStore: ObservableObject {
                 to: destination
             )
             try await reloadCatalog()
-            return true
+            return saved
         } catch {
             errorMessage = error.localizedDescription
-            return false
+            return nil
         }
     }
 

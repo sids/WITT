@@ -170,9 +170,10 @@ private enum AssignmentAlert: String, Identifiable {
 struct CaptureThingView: View {
     @ObservedObject var store: CatalogStore
     let destination: ThingDestination
-    let onSaved: () -> Void
+    let onPostSaveHandoff: (ThingPostSaveHandoff) -> Void
 
     @State private var photo: NormalizedPhoto?
+    @State private var savedThing: ThingSnapshot?
     @State private var showsCamera = false
     @State private var showsReview = false
     @State private var hasOfferedCamera = false
@@ -184,6 +185,18 @@ struct CaptureThingView: View {
     }
 
     var body: some View {
+        if let savedThing {
+            ThingSavedView(
+                thing: savedThing,
+                location: store.locationComponents(for: savedThing).joined(separator: " · "),
+                onAction: handlePostSaveAction
+            )
+        } else {
+            captureContent
+        }
+    }
+
+    private var captureContent: some View {
         List {
             Section {
                 if let photo, let image = UIImage(data: photo.jpegData) {
@@ -257,8 +270,30 @@ struct CaptureThingView: View {
                 store: store,
                 destination: destination,
                 photo: photo,
-                onSaved: onSaved
+                onSaved: showConfirmation
             )
+        }
+    }
+
+    private func showConfirmation(_ thing: ThingSnapshot) {
+        showsReview = false
+        savedThing = thing
+    }
+
+    private func handlePostSaveAction(_ action: ThingPostSaveAction) {
+        guard let savedThing else { return }
+        if action == .addAnotherHere {
+            photo = nil
+            photoError = nil
+            self.savedThing = nil
+            Task { @MainActor in
+                await Task.yield()
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    showsCamera = true
+                }
+            }
+        } else if let handoff = ThingPostSaveHandoff(action: action, thingID: savedThing.id) {
+            onPostSaveHandoff(handoff)
         }
     }
 
@@ -273,7 +308,7 @@ struct ReviewThingView: View {
     @ObservedObject var store: CatalogStore
     let destination: ThingDestination
     let photo: NormalizedPhoto?
-    let onSaved: () -> Void
+    let onSaved: (ThingSnapshot) -> Void
     @Environment(\.thingPhotoLabelingService) private var labelingService
 
     @State private var values = ManagementFormValues()
@@ -435,7 +470,45 @@ struct ReviewThingView: View {
             nameSource: nameWasAISupplied ? "ai-reviewed" : "user"
         )
         isSaving = false
-        if saved { onSaved() }
+        if let saved { onSaved(saved) }
+    }
+}
+
+struct ReviewThingSessionView: View {
+    @ObservedObject var store: CatalogStore
+    let destination: ThingDestination
+    let photo: NormalizedPhoto?
+    let onPostSaveHandoff: (ThingPostSaveHandoff) -> Void
+
+    @State private var savedThing: ThingSnapshot?
+    @State private var sessionID = UUID()
+
+    var body: some View {
+        if let savedThing {
+            ThingSavedView(
+                thing: savedThing,
+                location: store.locationComponents(for: savedThing).joined(separator: " · "),
+                onAction: handlePostSaveAction
+            )
+        } else {
+            ReviewThingView(
+                store: store,
+                destination: destination,
+                photo: photo,
+                onSaved: { savedThing = $0 }
+            )
+            .id(sessionID)
+        }
+    }
+
+    private func handlePostSaveAction(_ action: ThingPostSaveAction) {
+        guard let savedThing else { return }
+        if action == .addAnotherHere {
+            self.savedThing = nil
+            sessionID = UUID()
+        } else if let handoff = ThingPostSaveHandoff(action: action, thingID: savedThing.id) {
+            onPostSaveHandoff(handoff)
+        }
     }
 }
 

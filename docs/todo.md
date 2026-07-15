@@ -75,7 +75,11 @@ Workflow:
 
 ## P1 - Product And UX
 
-- [ ] UX-001 - Design and implement the fast post-save loop. Decide the default among Scan Next and Add Another Here while keeping View Thing available; the current flow returns to Browse.
+- [x] UX-001 - Implement the fast post-save loop with Add Another Here as the primary action. Completed July 15, 2026.
+  - [x] After either known-QR Review Thing or contextual Add Thing saves successfully, show one concise native Thing Saved surface instead of returning immediately to Browse.
+  - [x] Add Another Here starts a fresh Thing at the same exact destination; Scan Next dismisses before opening the full-screen scanner.
+  - [x] View Thing dismisses and navigates Browse to the exact saved Thing; Done returns to the unchanged Browse position.
+  - [x] Verified 4 focused state/routing tests, all 155 Debug tests, all 151 Release-optimized tests, a clean simulator build, and an iOS 26 simulator render of the shared post-save surface used by both entry paths.
 - [x] UX-002 - Let users enter and save Thing details manually while AI analysis is slow or unavailable instead of disabling the form until analysis completes. Completed July 15, 2026.
   - [x] Keep fields editable and enable Save from normal form validity alone in both known-QR Review Thing and contextual Add Thing flows.
   - [x] Apply late AI suggestions only to fields the user has not already filled or changed; never overwrite manual input.

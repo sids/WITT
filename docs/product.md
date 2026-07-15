@@ -47,6 +47,8 @@ The trailing Scan QR control is a first-class entry point for repeated catalogui
 
 Scanning a code already attached to a Storage Area or Container opens Add Thing for that destination. WITT offers the camera immediately, also permits choosing a photo, then analyzes the image and opens Review Thing. Name, comma-separated keywords, and notes remain editable while analysis runs, and the user may save as soon as the normal form requirements are met. A late suggestion fills only fields the user has not touched. If AI is unavailable, the same form remains usable with honest error messaging, retry, and manual entry.
 
+After a Thing saves, WITT keeps the physical cataloguing loop moving with one compact native Thing Saved surface. Add Another Here is the primary action and starts a fresh Thing at the same exact destination. Scan Next closes the current flow before reopening the full-screen scanner, View Thing opens the exact saved record through its current Browse hierarchy, and Done returns to the unchanged Browse position. Contextual Add Thing uses the same post-save choices.
+
 ### Unknown QR
 
 Scanning an unassigned code opens Attach QR directly. WITT first lists Storage Areas and Containers that do not already have a QR, grouped by type and labeled with their location paths. The user can attach in one step.

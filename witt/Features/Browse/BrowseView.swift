@@ -167,6 +167,7 @@ struct BrowseView: View {
     let onSharePlace: (UUID) -> Void
     let onPrintQRCodes: () -> Void
     let onScan: () -> Void
+    @Binding var navigationRequest: BrowseRoute?
     @AppStorage("witt.browse.savedDestination.v1") private var savedDestination = Data()
     @AppStorage("witt.browse.selectedPlaceID.v1") private var savedSelectedPlaceID = ""
     @State private var path: [BrowseRoute] = []
@@ -176,6 +177,7 @@ struct BrowseView: View {
     @State private var query = ""
     @State private var isSearchPresented = false
     @State private var hasPresentedEmptyPlaceCreation = false
+    @State private var thingPostSaveDismissal = ThingPostSaveDismissalState()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -208,17 +210,23 @@ struct BrowseView: View {
                 )
             }
         }
-        .sheet(item: $managementPresentation) { presentation in
+        .sheet(item: $managementPresentation, onDismiss: finishManagementDismissal) { presentation in
             ManagementSheet(
                 store: store,
                 route: presentation.route,
-                onCreatedPlace: selectCreatedPlace
+                onCreatedPlace: selectCreatedPlace,
+                onThingPostSaveHandoff: dismissManagement(after:)
             )
         }
         .onAppear(perform: restoreIfReady)
         .onChange(of: store.hasLoaded) { _, _ in restoreIfReady() }
         .onChange(of: store.places) { _, _ in reconcilePathAfterReload() }
         .onChange(of: path) { _, _ in persistCurrentDestination() }
+        .onChange(of: navigationRequest) { _, request in
+            guard let request else { return }
+            navigate(to: request)
+            navigationRequest = nil
+        }
     }
 
     private func browseChrome<Content: View>(_ content: Content) -> some View {
@@ -400,11 +408,32 @@ struct BrowseView: View {
     }
 
     private func navigateToSearchResult(_ thing: ThingSnapshot) {
-        let restored = BrowseSelectionRestorer.state(for: .thing(thing.id), in: store.activePlaces)
         isSearchPresented = false
         query = ""
+        navigate(to: .thing(thing.id))
+    }
+
+    private func navigate(to destination: BrowseRoute) {
+        let restored = BrowseSelectionRestorer.state(for: destination, in: store.activePlaces)
         apply(restored)
         persistCurrentDestination()
+    }
+
+    private func dismissManagement(after handoff: ThingPostSaveHandoff) {
+        thingPostSaveDismissal.begin(handoff)
+        managementPresentation = nil
+    }
+
+    private func finishManagementDismissal() {
+        guard let handoff = thingPostSaveDismissal.finish() else { return }
+        switch handoff {
+        case .scanNext:
+            onScan()
+        case .viewThing(let thingID):
+            navigate(to: .thing(thingID))
+        case .done:
+            break
+        }
     }
 
     private func apply(_ restored: BrowseRestoredState) {
@@ -1267,6 +1296,12 @@ private struct ThingThumbnail: View {
 #Preview("Browse") {
     let persistence = PersistenceController.inMemory()
     let store = CatalogStore(persistence: persistence)
-    BrowseView(store: store, onSharePlace: { _ in }, onPrintQRCodes: {}, onScan: {})
+    BrowseView(
+        store: store,
+        onSharePlace: { _ in },
+        onPrintQRCodes: {},
+        onScan: {},
+        navigationRequest: .constant(nil)
+    )
         .task { await store.bootstrap() }
 }

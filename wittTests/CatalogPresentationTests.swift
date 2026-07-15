@@ -591,8 +591,8 @@ final class CatalogPresentationTests: XCTestCase {
             to: .container(container.id),
             nameSource: "user"
         )
-        XCTAssertTrue(saved)
-        let thing = try XCTUnwrap(store.things.first { $0.name == "Drill" })
+        let thing = try XCTUnwrap(saved)
+        XCTAssertEqual(store.thing(id: thing.id)?.name, "Drill")
 
         let createdSecondPlace = await store.createPlace(.init(name: "Studio"))
         let secondPlace = try XCTUnwrap(createdSecondPlace)

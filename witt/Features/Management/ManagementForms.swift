@@ -1,6 +1,49 @@
 import SwiftUI
 import UIKit
 
+struct ThingSavedView: View {
+    let thing: ThingSnapshot
+    let location: String
+    let onAction: (ThingPostSaveAction) -> Void
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent {
+                    Text(thing.name)
+                } label: {
+                    Label("Thing Saved", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.tint)
+                }
+                Label(location, systemImage: "location")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Add Another Here", systemImage: "plus") {
+                    onAction(.addAnotherHere)
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("thingSaved.addAnother")
+
+                Button("Scan Next", systemImage: "qrcode.viewfinder") {
+                    onAction(.scanNext)
+                }
+                Button("View Thing", systemImage: "shippingbox") {
+                    onAction(.viewThing)
+                }
+                Button("Done", systemImage: "checkmark") {
+                    onAction(.done)
+                }
+            }
+        }
+        .navigationTitle("Thing Saved")
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("thingSaved.confirmation")
+    }
+}
+
 private struct ManagementPhotoSection: View {
     let existingThumbnailData: Data?
     @Binding var selection: ManagementPhotoSelection
@@ -686,6 +729,7 @@ struct ThingManagementForm: View {
     let thingID: UUID?
     let contextDestination: ThingDestination?
     @Binding var isSaving: Bool
+    let onCreated: (ThingSnapshot) -> Void
     let onFinished: () -> Void
     @Environment(\.thingPhotoLabelingService) private var labelingService
     @State private var values = ManagementFormValues()
@@ -902,24 +946,25 @@ struct ThingManagementForm: View {
             isSaving = false
             return
         }
-        let succeeded: Bool
         if let thingID {
-            succeeded =
+            let succeeded =
                 await store.updateThing(
                     id: thingID,
                     with: UpdateThingDraft(
                         name: values.normalizedName, keywords: values.parsedKeywords,
                         notes: values.normalizedNotes, destination: destination, photo: photo.updateMutation))
                 != nil
+            isSaving = false
+            if succeeded { onFinished() }
         } else {
             let nameWasAISupplied = aiAppliedName.map { $0 == values.normalizedName } == true
-            succeeded = await store.saveThing(
+            let saved = await store.saveThing(
                 name: values.normalizedName, keywords: values.parsedKeywords,
                 notes: values.normalizedNotes ?? "", photo: photo.createPhoto, to: destination,
                 nameSource: nameWasAISupplied ? "ai-reviewed" : "user")
+            isSaving = false
+            if let saved { onCreated(saved) }
         }
-        isSaving = false
-        if succeeded { onFinished() }
     }
 
     private func archive() async {

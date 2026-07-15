@@ -15,6 +15,58 @@ enum ManagementRoute: Identifiable, Hashable {
     var id: Self { self }
 }
 
+enum ThingPostSaveAction: Hashable, Sendable {
+    case addAnotherHere
+    case scanNext
+    case viewThing
+    case done
+}
+
+enum ThingPostSaveHandoff: Equatable, Sendable {
+    case scanNext
+    case viewThing(UUID)
+    case done
+
+    init?(action: ThingPostSaveAction, thingID: UUID) {
+        switch action {
+        case .addAnotherHere:
+            return nil
+        case .scanNext:
+            self = .scanNext
+        case .viewThing:
+            self = .viewThing(thingID)
+        case .done:
+            self = .done
+        }
+    }
+}
+
+struct ThingPostSaveDismissalState: Equatable, Sendable {
+    private(set) var pendingHandoff: ThingPostSaveHandoff?
+
+    mutating func begin(_ handoff: ThingPostSaveHandoff) {
+        pendingHandoff = handoff
+    }
+
+    mutating func finish() -> ThingPostSaveHandoff? {
+        defer { pendingHandoff = nil }
+        return pendingHandoff
+    }
+}
+
+extension ThingDestination {
+    init(home: ThingSnapshotHome) {
+        switch home {
+        case .room(let id):
+            self = .room(id)
+        case .area(let id):
+            self = .area(id)
+        case .container(let id):
+            self = .container(id)
+        }
+    }
+}
+
 enum ManagementPhotoSelection: Hashable, Sendable {
     case unchanged
     case replacement(NormalizedPhoto)

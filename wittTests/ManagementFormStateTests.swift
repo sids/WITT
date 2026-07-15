@@ -13,6 +13,49 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertNotEqual(ManagementRoute.editThing(id).id, .editContainer(id))
     }
 
+    func testThingPostSaveHandoffKeepsAddAnotherInsideTheCurrentFlow() {
+        XCTAssertNil(ThingPostSaveHandoff(action: .addAnotherHere, thingID: UUID()))
+    }
+
+    func testThingPostSaveHandoffPreservesRoutingIntentAndSavedThingID() {
+        let thingID = UUID()
+
+        XCTAssertEqual(
+            ThingPostSaveHandoff(action: .scanNext, thingID: thingID),
+            .scanNext
+        )
+        XCTAssertEqual(
+            ThingPostSaveHandoff(action: .viewThing, thingID: thingID),
+            .viewThing(thingID)
+        )
+        XCTAssertEqual(
+            ThingPostSaveHandoff(action: .done, thingID: thingID),
+            .done
+        )
+    }
+
+    func testThingPostSaveDismissalStateConsumesHandoffOnlyAfterDismissalFinishes() {
+        let thingID = UUID()
+        var state = ThingPostSaveDismissalState()
+
+        XCTAssertNil(state.finish())
+        state.begin(.viewThing(thingID))
+        XCTAssertEqual(state.pendingHandoff, .viewThing(thingID))
+        XCTAssertEqual(state.finish(), .viewThing(thingID))
+        XCTAssertNil(state.pendingHandoff)
+        XCTAssertNil(state.finish())
+    }
+
+    func testThingDestinationUsesSavedThingsExactHome() {
+        let roomID = UUID()
+        let areaID = UUID()
+        let containerID = UUID()
+
+        XCTAssertEqual(ThingDestination(home: .room(roomID)), .room(roomID))
+        XCTAssertEqual(ThingDestination(home: .area(areaID)), .area(areaID))
+        XCTAssertEqual(ThingDestination(home: .container(containerID)), .container(containerID))
+    }
+
     func testValuesNormalizeDraftTextAndKeywords() {
         let values = ManagementFormValues(
             name: "  Flashlight  ",
