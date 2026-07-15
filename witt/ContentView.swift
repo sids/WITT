@@ -93,6 +93,9 @@ struct ContentView: View {
         if ProcessInfo.processInfo.arguments.contains("--demo-create-attach") {
             return .createAttach
         }
+        if ProcessInfo.processInfo.arguments.contains("--demo-repair-qr") {
+            return .repair
+        }
 #endif
         return nil
     }

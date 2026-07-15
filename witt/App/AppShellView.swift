@@ -68,6 +68,12 @@ struct AppShellView: View {
                         token: token,
                         onAttached: closeScanFlow
                     )
+                case .repair(let route):
+                    RepairQRCodeView(
+                        store: store,
+                        route: route,
+                        onRepaired: closeScanFlow
+                    )
                 }
             }
         }
@@ -135,16 +141,8 @@ struct AppShellView: View {
                     presentedScan = ScanPresentation(flow: .capture(destination))
                 case .attach(let token):
                     presentedScan = ScanPresentation(flow: .attach(token))
-                case .needsRepair:
-                    deepLinkAlert = DeepLinkAlert(
-                        title: "QR Code Needs Attention",
-                        message: "This code was previously attached, but its Storage Area or Container is no longer available."
-                    )
-                case .conflict:
-                    deepLinkAlert = DeepLinkAlert(
-                        title: "QR Code Conflict",
-                        message: "This code is attached to more than one destination and needs to be repaired before use."
-                    )
+                case .repair(let route):
+                    presentedScan = ScanPresentation(flow: .repair(route))
                 }
             } catch {
                 deepLinkAlert = DeepLinkAlert(
@@ -186,16 +184,8 @@ struct AppShellView: View {
                     presentedScan = ScanPresentation(flow: .capture(destination))
                 case .attach(let token):
                     presentedScan = ScanPresentation(flow: .attach(token))
-                case .needsRepair:
-                    deepLinkAlert = DeepLinkAlert(
-                        title: "QR Code Needs Attention",
-                        message: "This code was previously attached, but its Storage Area or Container is no longer available."
-                    )
-                case .conflict:
-                    deepLinkAlert = DeepLinkAlert(
-                        title: "QR Code Conflict",
-                        message: "This code is attached to more than one destination and needs to be repaired before use."
-                    )
+                case .repair(let route):
+                    presentedScan = ScanPresentation(flow: .repair(route))
                 }
             } catch {
                 deepLinkAlert = DeepLinkAlert(
@@ -256,6 +246,27 @@ struct AppShellView: View {
         case .createAttach:
             let token = try! QRToken(validating: "BBBBBBBBBBBBBBBBBBBBBA")
             presentedScan = ScanPresentation(flow: .createAttach(token))
+        case .repair:
+            let token = try! QRToken(validating: "BBBBBBBBBBBBBBBBBBBBBA")
+            let targets = store.activePlaces.flatMap { place in
+                place.activeAreas.map { QRBindingTarget.area(QRTargetID(rawValue: $0.id)) }
+                    + place.activeContainers.map {
+                        QRBindingTarget.container(QRTargetID(rawValue: $0.id))
+                    }
+            }
+            let issue: QRCodeRepairIssue
+            if targets.count >= 2 {
+                issue = .conflict(QRCodeConflict(
+                    firstTarget: targets[0],
+                    secondTarget: targets[1],
+                    additionalTargets: Array(targets.dropFirst(2))
+                ))
+            } else {
+                issue = .unavailable(QRCodeRepair(reason: .missingTarget))
+            }
+            presentedScan = ScanPresentation(
+                flow: .repair(QRCodeRepairRoute(token: token, issue: issue))
+            )
         }
         pendingDemo = nil
     }
@@ -280,6 +291,7 @@ private struct ScanPresentation: Identifiable {
         case attach(QRToken)
         case review(ThingDestination, NormalizedPhoto?)
         case createAttach(QRToken)
+        case repair(QRCodeRepairRoute)
     }
 
     let id = UUID()

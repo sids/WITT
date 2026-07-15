@@ -150,6 +150,34 @@ final class CatalogStore: ObservableObject {
         try await reloadCatalog()
     }
 
+    func repairQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
+        _ = try await repository.repairQRCode(
+            QRCodeBindingRequest(token: token, target: target)
+        )
+        try await reloadCatalog()
+    }
+
+    func repairAndReplaceQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
+        _ = try await repository.repairAndReplaceQRCode(
+            QRCodeBindingRequest(token: token, target: target)
+        )
+        try await reloadCatalog()
+    }
+
+    func releaseRepairableQRCode(_ token: QRToken) async throws {
+        try await repository.releaseRepairableQRCode(token)
+        try await reloadCatalog()
+    }
+
+    func repairQRCodeTargetIsEligible(
+        _ token: QRToken,
+        target: QRBindingTarget
+    ) async -> Bool {
+        (try? await repository.repairQRCodeTargetIsEligible(
+            QRCodeBindingRequest(token: token, target: target)
+        )) == true
+    }
+
     func bind(_ token: QRToken, to target: QRAttachTargetSnapshot) async -> Bool {
         do {
             _ = try await repository.bindQRCode(
@@ -172,6 +200,51 @@ final class CatalogStore: ObservableObject {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func repairCreateTargetAndBind(_ request: CreateAndBindQRCodeRequest) async -> Bool {
+        do {
+            _ = try await repository.repairCreateTargetAndBindQRCode(request)
+            try await reloadCatalog()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func qrAttachTarget(for target: QRBindingTarget) -> QRAttachTargetSnapshot? {
+        for place in activePlaces {
+            switch target {
+            case .area(let targetID):
+                guard let area = place.activeAreas.first(where: { $0.id == targetID.rawValue }) else {
+                    continue
+                }
+                return QRAttachTargetSnapshot(
+                    id: area.id,
+                    placeID: place.id,
+                    kind: .area,
+                    name: area.name,
+                    locationComponents: Array(
+                        place.locationComponents(for: .area(area.id)).dropLast()
+                    )
+                )
+            case .container(let targetID):
+                guard let container = place.activeContainers.first(where: { $0.id == targetID.rawValue }) else {
+                    continue
+                }
+                return QRAttachTargetSnapshot(
+                    id: container.id,
+                    placeID: place.id,
+                    kind: .container,
+                    name: container.name,
+                    locationComponents: Array(
+                        place.locationComponents(for: .container(container.id)).dropLast()
+                    )
+                )
+            }
+        }
+        return nil
     }
 
     func saveThing(

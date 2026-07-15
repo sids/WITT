@@ -3,8 +3,7 @@ import Foundation
 enum QRDeepLinkDestination: Sendable {
     case addThing(ThingDestination)
     case attach(QRToken)
-    case needsRepair
-    case conflict
+    case repair(QRCodeRepairRoute)
 }
 
 struct QRDeepLinkRouter: Sendable {
@@ -27,10 +26,10 @@ struct QRDeepLinkRouter: Sendable {
             return .addThing(.container(id.rawValue))
         case .unknown:
             return .attach(token)
-        case .needsRepair:
-            return .needsRepair
-        case .conflict:
-            return .conflict
+        case .needsRepair(let repair):
+            return .repair(QRCodeRepairRoute(token: token, issue: .unavailable(repair)))
+        case .conflict(let conflict):
+            return .repair(QRCodeRepairRoute(token: token, issue: .conflict(conflict)))
         }
     }
 }

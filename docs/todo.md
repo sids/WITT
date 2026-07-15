@@ -90,8 +90,16 @@ Workflow:
   - [x] Restricted and unavailable camera states explain the limitation without implying that permission can always be changed.
   - [x] Returning from Settings refreshes authorization and resumes the requested camera flow when access has been granted.
   - [x] Verified 20 focused permission/photo/scanner tests, all 160 Debug tests, all 156 Release-optimized tests, clean simulator builds, and iOS 26 simulator renders of both denied-camera surfaces.
-- [ ] QR-001 - Decide whether a Storage Area or Container can have multiple QR codes. Align data rules, eligible-target queries, binding UI, conflict behavior, and docs.
-- [ ] QR-002 - Turn `needsRepair` and QR conflict alerts into a complete repair flow for archived, missing, or multiply bound targets.
+- [x] QR-001 - Enforce the first-release rule of exactly one active QR per Storage Area or Container and one active target per QR payload; multiple labels per target are deferred.
+  - [x] Product decision locked July 15, 2026.
+  - [x] Ordinary attach/reattach, eligible-target queries, conflict behavior, and user-facing copy follow the rule.
+  - [x] Repository coverage proves healthy cross-target takeover is refused and replacement/repair leaves one valid binding.
+- [x] QR-002 - Replace `needsRepair` and QR conflict dead ends with a complete repair flow for archived, missing, unsupported, or multiply bound targets.
+  - [x] Main scans and external WITT links open Repair QR directly with the payload and issue preserved.
+  - [x] Show conflicting active destinations and eligible unassigned Storage Areas/Containers immediately, with Create & Attach available.
+  - [x] Existing-target, new-target-draft, and create-and-attach repair paths are explicit and never take a healthy binding implicitly.
+  - [x] Existing-target and create-and-attach repairs atomically consolidate all damaged/duplicate rows into exactly one chosen binding.
+  - [x] Verified July 15, 2026 with 171 Debug tests, 167 Release-optimized tests, clean iOS 26 Debug build/run, and conflict/list plus no-target/create repair screenshots.
 - [ ] SEARCH-001 - Decide the scope and prominence of duplicate-Thing detection; implement only if it materially helps cataloging.
 - [ ] AI-002 - Decide whether AI confidence is user-visible or only used internally to flag suggestions for review.
 - [ ] THING-001 - Decide whether quantity belongs in first-release Thing capture.

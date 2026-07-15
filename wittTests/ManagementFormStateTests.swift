@@ -146,7 +146,7 @@ final class ManagementFormStateTests: XCTestCase {
         )
     }
 
-    func testQRAssignmentDecisionKeepsRepairAndConflictDistinct() {
+    func testQRAssignmentDecisionPreservesActionableRepairDetails() {
         let target = QRBindingTarget.area(QRTargetID(rawValue: UUID()))
         let repair = QRCodeRepair(reason: .missingTarget)
         let conflict = QRCodeConflict(firstTarget: target, secondTarget: target)
@@ -154,12 +154,12 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertEqual(
             QRAssignmentDecision.evaluate(
                 resolution: .needsRepair(repair), expectedTarget: target),
-            .needsRepair
+            .repair(.unavailable(repair))
         )
         XCTAssertEqual(
             QRAssignmentDecision.evaluate(
                 resolution: .conflict(conflict), expectedTarget: target),
-            .conflict
+            .repair(.conflict(conflict))
         )
     }
 

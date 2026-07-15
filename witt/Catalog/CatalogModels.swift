@@ -336,6 +336,7 @@ public enum CatalogRepositoryError: Error, Equatable, Sendable {
     case targetNotFound
     case targetAlreadyHasQRCode
     case tokenAlreadyBound
+    case qrCodeNotRepairable
     case selectionDoesNotBelongToParent
     case missingIdentity
     case invalidStoredHierarchy
@@ -364,6 +365,8 @@ extension CatalogRepositoryError: LocalizedError {
             "That Storage Area or Container already has a QR code."
         case .tokenAlreadyBound:
             "This QR code is already attached."
+        case .qrCodeNotRepairable:
+            "This QR code does not have a repairable attachment."
         case .selectionDoesNotBelongToParent:
             "The selected Room, Storage Area, and Container do not belong together."
         case .missingIdentity:
@@ -411,7 +414,20 @@ public protocol CatalogRepository: QRCodeResolving {
     func unassignedQRCodeTargets() async throws -> [QRAttachTargetSnapshot]
     @discardableResult func bindQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
     @discardableResult func replaceQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
+    @discardableResult func repairQRCode(
+        _ request: QRCodeBindingRequest
+    ) async throws -> QRCodeBinding
+    @discardableResult func repairAndReplaceQRCode(
+        _ request: QRCodeBindingRequest
+    ) async throws -> QRCodeBinding
+    func repairQRCodeTargetIsEligible(
+        _ request: QRCodeBindingRequest
+    ) async throws -> Bool
+    func releaseRepairableQRCode(_ token: QRToken) async throws
     @discardableResult func createTargetAndBindQRCode(
+        _ request: CreateAndBindQRCodeRequest
+    ) async throws -> QRAttachTargetSnapshot
+    @discardableResult func repairCreateTargetAndBindQRCode(
         _ request: CreateAndBindQRCodeRequest
     ) async throws -> QRAttachTargetSnapshot
 }

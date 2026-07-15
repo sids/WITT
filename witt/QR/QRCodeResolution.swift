@@ -37,6 +37,7 @@ public enum QRCodeRepairReason: Hashable, Sendable, Codable {
     case missingTarget
     case unsupportedTargetKind
     case invalidStoredToken
+    case duplicateBindings
 }
 
 public struct QRCodeRepair: Hashable, Sendable, Codable {
@@ -75,6 +76,21 @@ public enum QRCodeResolution: Hashable, Sendable, Codable {
     case unknown
     case needsRepair(QRCodeRepair)
     case conflict(QRCodeConflict)
+}
+
+public enum QRCodeRepairIssue: Hashable, Sendable {
+    case unavailable(QRCodeRepair)
+    case conflict(QRCodeConflict)
+}
+
+public struct QRCodeRepairRoute: Hashable, Sendable {
+    public let token: QRToken
+    public let issue: QRCodeRepairIssue
+
+    public init(token: QRToken, issue: QRCodeRepairIssue) {
+        self.token = token
+        self.issue = issue
+    }
 }
 
 public protocol QRCodeResolving: Sendable {

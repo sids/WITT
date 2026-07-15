@@ -31,8 +31,8 @@ Place
 - Browse, search, editing, QR routing, and sharing operate on persistent catalogue data, not demo content.
 - Photos are supported for Places, Storage Areas, Containers, and Things. Thing capture accepts the camera or photo library.
 - Any non-empty QR-code payload can attach to a Storage Area or Container. WITT-generated labels use versioned `witt://` links so scanning them outside the app can launch WITT directly. Rooms and Things do not receive QR codes in the MVP.
-- The current attach flow offers targets without an active QR. Whether WITT should support multiple active QR codes per target remains a product decision in [todo.md](todo.md).
-- New Storage Areas and Containers may scan and bind any unused QR code before saving. Existing targets expose Attach QR Code or Reattach QR Code from their navigation action menu. Reattaching replaces that target's current binding and makes its former label unassigned again; WITT must reject, rather than silently move, a scanned code already attached elsewhere.
+- The attach flow offers targets without an active QR. For the first release, each Storage Area or Container has one active QR; supporting multiple labels for one target is deferred.
+- New Storage Areas and Containers may scan and bind any unused QR code before saving. Existing targets expose Attach QR Code or Reattach QR Code from their navigation action menu. For the first release, a Storage Area or Container has exactly one active QR code and each QR payload belongs to exactly one active target. Reattaching replaces that target's current binding and makes its former label unassigned again; WITT must reject, rather than silently move, a healthy code already attached elsewhere. Multiple labels for one target are deferred.
 - Things always have one current location and can be moved within the same Place.
 - Containers may be nested. Archiving a parent archives its contained catalogue branch after confirmation.
 - Sharing is rooted at the Place and grants invited participants complete read/write collaboration for that Place.
@@ -56,6 +56,12 @@ After a Thing saves, WITT keeps the physical cataloguing loop moving with one co
 Scanning an unassigned code opens Attach QR directly. WITT first lists Storage Areas and Containers that do not already have a QR, grouped by type and labeled with their location paths. The user can attach in one step.
 
 When no suitable target exists, or the user chooses Create & Attach, one screen supports selecting or creating the Place context, Room, and Storage Area, then attaching to that Storage Area or selecting or creating a Container. Creation and attachment succeed as one operation. There is no intermediate QR explanation screen and no option to bind the code to a Room or Thing.
+
+### Repair
+
+Scanning a code with a missing, archived, unsupported, or multiply bound destination opens Repair QR directly instead of stopping at an alert. WITT explains the issue briefly, shows conflicting active destinations when present, and immediately lists eligible unassigned Storage Areas and Containers. Choosing an existing target or using Create & Attach removes every damaged or duplicate row for that payload and leaves exactly one valid binding as one repository operation.
+
+When a damaged code is scanned from an existing target's Attach/Reattach action, WITT can repair and use it on that explicit target after confirmation. The same confirmation may release a damaged code for a pending New Storage Area or New Container draft so the normal save transaction can bind it. Repair is available only for genuinely damaged or conflicting data; WITT never uses repair to take a healthy code from another target.
 
 ## Browse And Creation
 

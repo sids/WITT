@@ -7,6 +7,7 @@ enum ScanDemo: String, Identifiable {
     case unknown
     case review
     case createAttach
+    case repair
 
     var id: String { rawValue }
 }
@@ -41,10 +42,11 @@ struct QRAssignmentScanner: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isProcessing = false
     @State private var alert: AssignmentAlert?
+    @State private var repairRequest: AssignmentRepairRequest?
 
     var body: some View {
         NavigationStack {
-            QRScannerView(isPaused: isProcessing || alert != nil) { payload in
+            QRScannerView(isPaused: isProcessing || alert != nil || repairRequest != nil) { payload in
                 process(payload)
             }
             .navigationTitle("Scan QR Code")
@@ -62,6 +64,27 @@ struct QRAssignmentScanner: View {
                 message: Text(alert.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .confirmationDialog(
+            "Repair QR Code?",
+            isPresented: Binding(
+                get: { repairRequest != nil },
+                set: { if !$0 { repairRequest = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: repairRequest
+        ) { request in
+            Button("Repair and Use This Code") {
+                repairAndUse(request)
+            }
+            .accessibilityIdentifier("qrAssignment.repairAndUse")
+            Button("Scan Another", role: .cancel) {
+                repairRequest = nil
+                isProcessing = false
+            }
+            .accessibilityIdentifier("qrAssignment.scanAnother")
+        } message: { request in
+            Text(request.message)
         }
     }
 
@@ -87,10 +110,13 @@ struct QRAssignmentScanner: View {
                     dismiss()
                 case .alreadyAttached:
                     show(.alreadyAttached)
-                case .needsRepair:
-                    show(.needsRepair)
-                case .conflict:
-                    show(.conflict)
+                case .repair(let issue):
+                    isProcessing = false
+                    repairRequest = AssignmentRepairRequest(
+                        token: token,
+                        issue: issue,
+                        bindsImmediately: expectedTarget != nil
+                    )
                 }
             } catch CatalogRepositoryError.tokenAlreadyBound {
                 show(.alreadyAttached)
@@ -104,14 +130,34 @@ struct QRAssignmentScanner: View {
         isProcessing = false
         alert = newAlert
     }
+
+    private func repairAndUse(_ request: AssignmentRepairRequest) {
+        repairRequest = nil
+        isProcessing = true
+        Task {
+            do {
+                if let expectedTarget {
+                    try await store.repairAndReplaceQRCode(
+                        request.token,
+                        target: expectedTarget
+                    )
+                } else {
+                    try await store.releaseRepairableQRCode(request.token)
+                    try await onAssign(request.token)
+                }
+                dismiss()
+            } catch {
+                show(.assignmentFailed)
+            }
+        }
+    }
 }
 
 enum QRAssignmentDecision: Equatable {
     case assign
     case accept
     case alreadyAttached
-    case needsRepair
-    case conflict
+    case repair(QRCodeRepairIssue)
 
     static func evaluate(
         resolution: QRCodeResolution,
@@ -124,10 +170,29 @@ enum QRAssignmentDecision: Equatable {
             expectedTarget == .area(id) ? .accept : .alreadyAttached
         case .knownContainer(let id):
             expectedTarget == .container(id) ? .accept : .alreadyAttached
-        case .needsRepair:
-            .needsRepair
+        case .needsRepair(let repair):
+            .repair(.unavailable(repair))
+        case .conflict(let conflict):
+            .repair(.conflict(conflict))
+        }
+    }
+}
+
+private struct AssignmentRepairRequest: Identifiable {
+    let id = UUID()
+    let token: QRToken
+    let issue: QRCodeRepairIssue
+    let bindsImmediately: Bool
+
+    var message: String {
+        if !bindsImmediately {
+            return "Repairing removes the damaged attachments and returns this code to the draft. The code will be attached when the new destination is saved."
+        }
+        return switch issue {
+        case .unavailable:
+            "This code has a damaged attachment. Repairing it will release the unavailable destination and use the code here."
         case .conflict:
-            .conflict
+            "This code has conflicting attachments. Repairing it will remove those conflicts and use the code here."
         }
     }
 }
@@ -135,8 +200,6 @@ enum QRAssignmentDecision: Equatable {
 private enum AssignmentAlert: String, Identifiable {
     case invalidCode
     case alreadyAttached
-    case needsRepair
-    case conflict
     case assignmentFailed
 
     var id: String { rawValue }
@@ -145,8 +208,6 @@ private enum AssignmentAlert: String, Identifiable {
         switch self {
         case .invalidCode: "Invalid QR Code"
         case .alreadyAttached: "QR Code Already Attached"
-        case .needsRepair: "QR Code Needs Repair"
-        case .conflict: "QR Code Conflict"
         case .assignmentFailed: "Unable to Attach QR Code"
         }
     }
@@ -157,10 +218,6 @@ private enum AssignmentAlert: String, Identifiable {
             "Scan a QR code with a non-empty payload."
         case .alreadyAttached:
             "This QR code is attached to another Storage Area or Container. Scan a different code."
-        case .needsRepair:
-            "This QR code has an incomplete attachment that must be repaired before it can be used."
-        case .conflict:
-            "This QR code has conflicting attachments that must be resolved before it can be used."
         case .assignmentFailed:
             "WITT could not attach this QR code. Try scanning it again."
         }

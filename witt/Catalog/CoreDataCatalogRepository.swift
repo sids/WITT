@@ -628,6 +628,97 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     }
 
     @discardableResult
+    public func repairQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding {
+        try await repairQRCode(request, replacingTargetQRCode: false)
+    }
+
+    @discardableResult
+    public func repairAndReplaceQRCode(
+        _ request: QRCodeBindingRequest
+    ) async throws -> QRCodeBinding {
+        try await repairQRCode(request, replacingTargetQRCode: true)
+    }
+
+    private func repairQRCode(
+        _ request: QRCodeBindingRequest,
+        replacingTargetQRCode: Bool
+    ) async throws -> QRCodeBinding {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let repairRows = try Self.fetchQRCodes(
+                    token: request.token.rawValue,
+                    in: context
+                )
+                try Self.requireRepairable(repairRows)
+
+                let target = try Self.fetchQRTarget(request.target, in: context)
+                if !replacingTargetQRCode {
+                    try Self.requireRepairTargetAvailable(
+                        target,
+                        for: request.token,
+                        in: context
+                    )
+                }
+                try Self.consolidate(
+                    repairRows,
+                    token: request.token,
+                    onto: target,
+                    in: context
+                )
+
+                try context.save()
+                return QRCodeBinding(token: request.token, target: request.target)
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    public func repairQRCodeTargetIsEligible(
+        _ request: QRCodeBindingRequest
+    ) async throws -> Bool {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            let repairRows = try Self.fetchQRCodes(
+                token: request.token.rawValue,
+                in: context
+            )
+            try Self.requireRepairable(repairRows)
+            let target = try Self.fetchQRTarget(request.target, in: context)
+            do {
+                try Self.requireRepairTargetAvailable(
+                    target,
+                    for: request.token,
+                    in: context
+                )
+                return true
+            } catch CatalogRepositoryError.targetAlreadyHasQRCode {
+                return false
+            }
+        }
+    }
+
+    public func releaseRepairableQRCode(_ token: QRToken) async throws {
+        try ensurePersistenceLoaded()
+        try await context.perform { [context] in
+            context.reset()
+            do {
+                let repairRows = try Self.fetchQRCodes(token: token.rawValue, in: context)
+                try Self.requireRepairable(repairRows)
+                repairRows.forEach(context.delete)
+                try context.save()
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
+    @discardableResult
     public func createTargetAndBindQRCode(
         _ request: CreateAndBindQRCodeRequest
     ) async throws -> QRAttachTargetSnapshot {
@@ -694,38 +785,88 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         }
     }
 
+    @discardableResult
+    public func repairCreateTargetAndBindQRCode(
+        _ request: CreateAndBindQRCodeRequest
+    ) async throws -> QRAttachTargetSnapshot {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let repairRows = try Self.fetchQRCodes(
+                    token: request.token.rawValue,
+                    in: context
+                )
+                try Self.requireRepairable(repairRows)
+
+                let place: Place = try Self.fetchOne(
+                    id: request.placeID,
+                    entityName: "Place",
+                    in: context,
+                    notFound: .targetNotFound
+                )
+                guard place.archivedAt == nil else {
+                    throw CatalogRepositoryError.targetNotFound
+                }
+                let room = try Self.resolveRoom(request.room, in: place, context: context)
+                let area = try Self.resolveArea(request.area, in: room, place: place, context: context)
+                let target = try Self.resolveAttachment(
+                    request.attachment,
+                    in: area,
+                    place: place,
+                    context: context
+                )
+                try Self.requireRepairTargetAvailable(
+                    target,
+                    for: request.token,
+                    in: context
+                )
+                try Self.consolidate(
+                    repairRows,
+                    token: request.token,
+                    onto: target,
+                    in: context
+                )
+
+                let inserted = Array(context.insertedObjects)
+                if let store = place.objectID.persistentStore {
+                    for object in inserted {
+                        context.assign(object, to: store)
+                    }
+                }
+                for object in inserted {
+                    try Self.validateInsertedObject(object)
+                }
+
+                let targetSnapshot: QRAttachTargetSnapshot
+                switch target.target {
+                case .area:
+                    guard let snapshot = Self.attachTarget(for: area) else {
+                        throw CatalogRepositoryError.invalidStoredHierarchy
+                    }
+                    targetSnapshot = snapshot
+                case .container:
+                    let container = try context.existingObject(with: target.objectID) as! Container
+                    guard let snapshot = Self.attachTarget(for: container) else {
+                        throw CatalogRepositoryError.invalidStoredHierarchy
+                    }
+                    targetSnapshot = snapshot
+                }
+                try context.save()
+                return targetSnapshot
+            } catch {
+                context.rollback()
+                throw error
+            }
+        }
+    }
+
     public func resolve(_ token: QRToken) async throws -> QRCodeResolution {
         try ensurePersistenceLoaded()
         let storedResolution = try await context.perform { [context] in
             context.reset()
             let rows = try Self.fetchQRCodes(token: token.rawValue, in: context)
-            guard !rows.isEmpty else { return StoredQRResolution.unknown }
-
-            var targets: [RawQRTarget] = []
-            var repair: (QRCodeRepairReason, UUID?)?
-            for row in rows {
-                if QRToken(rawValue: row.token) == nil {
-                    repair = (.invalidStoredToken, row.id)
-                    continue
-                }
-                guard row.state == "bound" else {
-                    repair = (.missingTarget, row.id)
-                    continue
-                }
-                let rowTargets = Self.bindingTargets(for: row)
-                guard !rowTargets.isEmpty else {
-                    repair = (.missingTarget, row.id)
-                    continue
-                }
-                for target in rowTargets where !targets.contains(target) {
-                    targets.append(target)
-                }
-            }
-
-            if targets.count > 1 { return .conflict(targets) }
-            if let repair { return .repair(reason: repair.0, bindingID: repair.1) }
-            guard let target = targets.first else { return .repair(reason: .missingTarget, bindingID: rows.first?.id) }
-            return .known(target)
+            return Self.storedResolution(for: rows)
         }
         return Self.publicResolution(storedResolution)
     }
@@ -1190,6 +1331,92 @@ private extension CoreDataCatalogRepository {
         request.predicate = NSPredicate(format: "token == %@", token)
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true), NSSortDescriptor(key: "id", ascending: true)]
         return try context.fetch(request)
+    }
+
+    nonisolated static func storedResolution(for rows: [QRCode]) -> StoredQRResolution {
+        guard !rows.isEmpty else { return .unknown }
+
+        var activeTargets: [RawQRTarget] = []
+        var repair: (QRCodeRepairReason, UUID?)?
+        for row in rows {
+            guard !row.token.isEmpty else {
+                repair = repair ?? (.invalidStoredToken, row.id)
+                continue
+            }
+            guard row.state == "bound" else {
+                repair = repair ?? (.missingTarget, row.id)
+                continue
+            }
+
+            let rowTargets = bindingTargets(for: row)
+            guard rowTargets.count == 1 else {
+                if rowTargets.isEmpty {
+                    repair = repair ?? (.missingTarget, row.id)
+                } else {
+                    activeTargets.append(contentsOf: rowTargets)
+                }
+                continue
+            }
+            activeTargets.append(rowTargets[0])
+        }
+
+        let distinctTargets = activeTargets.reduce(into: [RawQRTarget]()) { result, target in
+            guard !result.contains(target) else { return }
+            result.append(target)
+        }
+        if distinctTargets.count > 1 {
+            return .conflict(distinctTargets)
+        }
+        if let repair {
+            return .repair(reason: repair.0, bindingID: repair.1)
+        }
+        if rows.count > 1 {
+            return .repair(reason: .duplicateBindings, bindingID: rows.first?.id)
+        }
+        guard let target = distinctTargets.first else {
+            return .repair(reason: .missingTarget, bindingID: rows.first?.id)
+        }
+        return .known(target)
+    }
+
+    nonisolated static func requireRepairable(_ rows: [QRCode]) throws {
+        switch storedResolution(for: rows) {
+        case .repair, .conflict:
+            return
+        case .unknown, .known:
+            throw CatalogRepositoryError.qrCodeNotRepairable
+        }
+    }
+
+    static func requireRepairTargetAvailable(
+        _ target: QRTargetObject,
+        for token: QRToken,
+        in context: NSManagedObjectContext
+    ) throws {
+        let targetRows = managedObjects(target.qrCodes, as: QRCode.self)
+        let otherTokens = Set(targetRows.lazy.map(\.token).filter { $0 != token.rawValue })
+        for rawToken in otherTokens {
+            let rows = try fetchQRCodes(token: rawToken, in: context)
+            if case .known(let boundTarget) = storedResolution(for: rows),
+               boundTarget == target.target
+            {
+                throw CatalogRepositoryError.targetAlreadyHasQRCode
+            }
+        }
+    }
+
+    static func consolidate(
+        _ repairRows: [QRCode],
+        token: QRToken,
+        onto target: QRTargetObject,
+        in context: NSManagedObjectContext
+    ) throws {
+        let targetRows = managedObjects(target.qrCodes, as: QRCode.self)
+        var deleted = Set<NSManagedObjectID>()
+        for row in repairRows + targetRows where deleted.insert(row.objectID).inserted {
+            context.delete(row)
+        }
+        try insertQRCode(token, for: target, in: context)
     }
 
     static func insertQRCode(

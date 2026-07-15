@@ -99,6 +99,208 @@ struct AttachQRCodeView: View {
     }
 }
 
+struct RepairQRCodeView: View {
+    @ObservedObject var store: CatalogStore
+    let route: QRCodeRepairRoute
+    let onRepaired: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var showsCreateForm = false
+    @State private var repairingTargetID: UUID?
+    @State private var isLoadingTargets = true
+    @State private var errorMessage: String?
+    @State private var eligibleConflictTargetIDs = Set<UUID>()
+
+    private var conflictTargets: [QRAttachTargetSnapshot] {
+        guard case .conflict(let conflict) = route.issue else { return [] }
+        return conflict.targets.compactMap(store.qrAttachTarget(for:))
+    }
+
+    private var unassignedTargets: [QRAttachTargetSnapshot] {
+        let conflictIDs = Set(conflictTargets.map(\.id))
+        return store.unassignedQRCodeTargets.filter { !conflictIDs.contains($0.id) }
+    }
+
+    private var areas: [QRAttachTargetSnapshot] {
+        unassignedTargets.filter { $0.kind == .area }
+    }
+
+    private var containers: [QRAttachTargetSnapshot] {
+        unassignedTargets.filter { $0.kind == .container }
+    }
+
+    private var hasExistingTarget: Bool {
+        !eligibleConflictTargetIDs.isEmpty || !areas.isEmpty || !containers.isEmpty
+    }
+
+    var body: some View {
+        Group {
+            if isLoadingTargets {
+                ProgressView("Loading Repair Options")
+            } else if !hasExistingTarget {
+                CreateAndAttachView(
+                    store: store,
+                    token: route.token,
+                    onAttached: onRepaired,
+                    repairsQRCode: true,
+                    repairMessage: directCreateMessage
+                )
+            } else {
+                List {
+                    Section {
+                        Text(issueMessage)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if !conflictTargets.isEmpty {
+                        Section("Currently Attached") {
+                            ForEach(conflictTargets) { target in
+                                if eligibleConflictTargetIDs.contains(target.id) {
+                                    repairButton(target)
+                                } else {
+                                    unavailableConflictRow(target)
+                                }
+                            }
+                        }
+                    }
+
+                    if !areas.isEmpty {
+                        Section("Storage Areas without QR") {
+                            ForEach(areas) { target in
+                                repairButton(target)
+                            }
+                        }
+                    }
+
+                    if !containers.isEmpty {
+                        Section("Containers without QR") {
+                            ForEach(containers) { target in
+                                repairButton(target)
+                            }
+                        }
+                    }
+
+                    Section {
+                        Button {
+                            showsCreateForm = true
+                        } label: {
+                            Label("Create & Attach", systemImage: "plus")
+                        }
+                        .accessibilityIdentifier("repairQR.create")
+                    }
+                }
+                .refreshable { await loadRepairOptions() }
+            }
+        }
+        .navigationTitle("Repair QR")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+        }
+        .task { await loadRepairOptions() }
+        .navigationDestination(isPresented: $showsCreateForm) {
+            CreateAndAttachView(
+                store: store,
+                token: route.token,
+                onAttached: onRepaired,
+                repairsQRCode: true,
+                repairMessage: issueMessage
+            )
+        }
+        .alert("Unable to Repair QR Code", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "Try again.")
+        }
+    }
+
+    private var issueMessage: String {
+        switch route.issue {
+        case .conflict:
+            "This QR code is attached to multiple destinations. Choose the one destination that should keep it, or attach it somewhere new."
+        case .unavailable(let repair):
+            switch repair.reason {
+            case .missingTarget:
+                "This QR code's previous destination is no longer available. Choose a new destination to repair it."
+            case .unsupportedTargetKind:
+                "This QR code's previous destination is not supported. Choose a Storage Area or Container to repair it."
+            case .invalidStoredToken, .duplicateBindings:
+                "This QR code has a damaged attachment. Choose one destination to repair it."
+            }
+        }
+    }
+
+    private var directCreateMessage: String {
+        guard !conflictTargets.isEmpty else { return issueMessage }
+        return "This QR code has conflicting attachments, but those destinations already have other QR codes. Create a new destination to repair it."
+    }
+
+    private func loadRepairOptions() async {
+        await store.reload()
+        var eligibleIDs = Set<UUID>()
+        for target in conflictTargets where await store.repairQRCodeTargetIsEligible(
+            route.token,
+            target: target.bindingTarget
+        ) {
+            eligibleIDs.insert(target.id)
+        }
+        eligibleConflictTargetIDs = eligibleIDs
+        isLoadingTargets = false
+    }
+
+    private func repairButton(_ target: QRAttachTargetSnapshot) -> some View {
+        Button {
+            repairingTargetID = target.id
+            Task {
+                do {
+                    try await store.repairQRCode(route.token, target: target.bindingTarget)
+                    onRepaired()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+                repairingTargetID = nil
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(target.name)
+                    Text(target.locationComponents.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if repairingTargetID == target.id {
+                    ProgressView()
+                }
+            }
+        }
+        .disabled(repairingTargetID != nil)
+        .foregroundStyle(.primary)
+        .accessibilityIdentifier("repairQR.target.\(target.id.uuidString)")
+        .accessibilityLabel(
+            "Repair QR code and attach to \(target.name), \(target.locationComponents.joined(separator: ", "))"
+        )
+    }
+
+    private func unavailableConflictRow(_ target: QRAttachTargetSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(target.name)
+            Text(target.locationComponents.joined(separator: " · "))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Label("Already has another QR code", systemImage: "qrcode")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityIdentifier("repairQR.targetUnavailable.\(target.id.uuidString)")
+    }
+}
+
 struct CreateAndAttachView: View {
     private enum Destination: Hashable {
         case area
@@ -108,6 +310,8 @@ struct CreateAndAttachView: View {
     @ObservedObject var store: CatalogStore
     let token: QRToken
     let onAttached: () -> Void
+    var repairsQRCode = false
+    var repairMessage: String?
 
     @State private var selectedPlaceID: UUID?
     @State private var selectedRoomID: UUID?
@@ -146,6 +350,13 @@ struct CreateAndAttachView: View {
 
     var body: some View {
         Form {
+            if repairsQRCode {
+                Section {
+                    Text(repairMessage ?? "Choose where this QR code should be attached after repair.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if store.activePlaces.count > 1 {
                 Section("Place") {
                     Picker("Place", selection: $selectedPlaceID) {
@@ -235,15 +446,17 @@ struct CreateAndAttachView: View {
                 }
             }
         }
-        .navigationTitle("Create & Attach")
+        .navigationTitle(repairsQRCode ? "Repair QR" : "Create & Attach")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Attach") {
+                Button(repairsQRCode ? "Repair & Attach" : "Attach") {
                     Task { await createAndAttach() }
                 }
                 .disabled(!isValid || isSaving)
-                .accessibilityIdentifier("createAttach.confirm")
+                .accessibilityIdentifier(
+                    repairsQRCode ? "repairQR.create.confirm" : "createAttach.confirm"
+                )
             }
         }
         .onAppear { synchronizeSelections() }
@@ -329,15 +542,18 @@ struct CreateAndAttachView: View {
         }
 
         isSaving = true
-        let saved = await store.createTargetAndBind(
-            CreateAndBindQRCodeRequest(
-                token: token,
-                placeID: place.id,
-                room: roomSelection,
-                area: areaSelection,
-                attachment: attachment
-            )
+        let request = CreateAndBindQRCodeRequest(
+            token: token,
+            placeID: place.id,
+            room: roomSelection,
+            area: areaSelection,
+            attachment: attachment
         )
+        let saved = if repairsQRCode {
+            await store.repairCreateTargetAndBind(request)
+        } else {
+            await store.createTargetAndBind(request)
+        }
         isSaving = false
         if saved { onAttached() }
     }

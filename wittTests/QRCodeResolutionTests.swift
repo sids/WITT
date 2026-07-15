@@ -81,6 +81,35 @@ final class QRCodeResolutionTests: XCTestCase {
         }
         XCTAssertEqual(routedToken.rawValue, token.rawValue)
     }
+
+    func testDeepLinkRouterPreservesRepairTokenAndDetails() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "repair payload"))
+        let repair = QRCodeRepair(reason: .missingTarget, bindingID: UUID())
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .needsRepair(repair)))
+
+        let destination = try await router.destination(for: token)
+
+        guard case .repair(let route) = destination else {
+            return XCTFail("Expected the Repair QR destination")
+        }
+        XCTAssertEqual(route, QRCodeRepairRoute(token: token, issue: .unavailable(repair)))
+    }
+
+    func testDeepLinkRouterPreservesConflictTokenAndTargets() async throws {
+        let token = try XCTUnwrap(QRToken(rawValue: "conflict payload"))
+        let conflict = QRCodeConflict(
+            firstTarget: .area(QRTargetID(rawValue: UUID())),
+            secondTarget: .container(QRTargetID(rawValue: UUID()))
+        )
+        let router = QRDeepLinkRouter(resolver: StubResolver(result: .conflict(conflict)))
+
+        let destination = try await router.destination(for: token)
+
+        guard case .repair(let route) = destination else {
+            return XCTFail("Expected the Repair QR destination")
+        }
+        XCTAssertEqual(route, QRCodeRepairRoute(token: token, issue: .conflict(conflict)))
+    }
 }
 
 private struct StubResolver: QRCodeResolving {
