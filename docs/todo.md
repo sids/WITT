@@ -76,7 +76,11 @@ Workflow:
 ## P1 - Product And UX
 
 - [ ] UX-001 - Design and implement the fast post-save loop. Decide the default among Scan Next and Add Another Here while keeping View Thing available; the current flow returns to Browse.
-- [ ] UX-002 - Let users enter and save Thing details manually while AI analysis is slow or unavailable instead of disabling the form until analysis completes.
+- [x] UX-002 - Let users enter and save Thing details manually while AI analysis is slow or unavailable instead of disabling the form until analysis completes. Completed July 15, 2026.
+  - [x] Keep fields editable and enable Save from normal form validity alone in both known-QR Review Thing and contextual Add Thing flows.
+  - [x] Apply late AI suggestions only to fields the user has not already filled or changed; never overwrite manual input.
+  - [x] Ignore stale AI results after save, dismissal, photo replacement, or photo removal, while preserving honest failure and retry states.
+  - [x] Verified 11 focused state tests, all 151 Debug tests, all 147 Release-optimized tests, and iOS 26 simulator screenshots covering active analysis and unavailable manual-entry states in both creation paths.
 - [ ] UX-003 - Add actionable camera-denied recovery, including Open Settings; decide whether manual QR entry belongs in the first release.
 - [ ] QR-001 - Decide whether a Storage Area or Container can have multiple QR codes. Align data rules, eligible-target queries, binding UI, conflict behavior, and docs.
 - [ ] QR-002 - Turn `needsRepair` and QR conflict alerts into a complete repair flow for archived, missing, or multiply bound targets.

@@ -137,6 +137,13 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertTrue(userNamed.suppliedKeywords)
         XCTAssertTrue(userNamed.suppliedNotes)
 
+        let aiNamed = ManagementAISuggestionApplication.apply(
+            suggestion,
+            to: ManagementFormValues()
+        )
+        XCTAssertEqual(aiNamed.values.name, "Flashlight")
+        XCTAssertTrue(aiNamed.suppliedName)
+
         let empty = ManagementAISuggestionApplication.apply(
             ThingLabelSuggestion(proposedName: "  ", detail: nil),
             to: ManagementFormValues()
@@ -144,6 +151,51 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertFalse(empty.suppliedName)
         XCTAssertFalse(empty.suppliedKeywords)
         XCTAssertFalse(empty.suppliedNotes)
+    }
+
+    func testAISuggestionPreservesManualEditsMadeWhileAnalysisWasPending() {
+        let suggestion = ThingLabelSuggestion(
+            proposedName: "Flashlight",
+            keywords: ["torch", "battery"],
+            detail: "Black aluminum body."
+        )
+        let current = ManagementFormValues(
+            name: "My Torch",
+            notes: "",
+            keywords: ""
+        )
+
+        let application = ManagementAISuggestionApplication.apply(
+            suggestion,
+            to: current,
+            preserving: [.name, .notes]
+        )
+
+        XCTAssertEqual(application.values.name, "My Torch")
+        XCTAssertEqual(application.values.notes, "")
+        XCTAssertEqual(application.values.parsedKeywords, ["torch", "battery"])
+        XCTAssertFalse(application.suppliedName)
+        XCTAssertFalse(application.suppliedNotes)
+        XCTAssertTrue(application.suppliedKeywords)
+    }
+
+    func testAISuggestionDoesNotFillAFieldThatWasEditedThenCleared() {
+        let suggestion = ThingLabelSuggestion(
+            proposedName: "Flashlight",
+            keywords: ["torch"],
+            detail: "Black aluminum body."
+        )
+
+        let application = ManagementAISuggestionApplication.apply(
+            suggestion,
+            to: ManagementFormValues(),
+            preserving: [.name, .keywords, .notes]
+        )
+
+        XCTAssertEqual(application.values, ManagementFormValues())
+        XCTAssertFalse(application.suppliedName)
+        XCTAssertFalse(application.suppliedKeywords)
+        XCTAssertFalse(application.suppliedNotes)
     }
 
     private func makePhoto() -> NormalizedPhoto {

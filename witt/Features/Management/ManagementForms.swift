@@ -695,6 +695,7 @@ struct ThingManagementForm: View {
     @State private var isAnalyzing = false
     @State private var analysisError: String?
     @State private var analysisRequestID: UUID?
+    @State private var editedFields: Set<ManagementAIEditableField> = []
     @State private var aiAppliedName: String?
     @State private var aiAppliedKeywords: String?
     @State private var aiAppliedNotes: String?
@@ -726,11 +727,11 @@ struct ThingManagementForm: View {
                         }
                     }
                     Section("Thing") {
-                        TextField("Name", text: $values.name)
+                        TextField("Name", text: nameBinding)
                             .focused($isNameFocused)
-                        TextField("Keywords", text: $values.keywords, axis: .vertical)
+                        TextField("Keywords", text: keywordsBinding, axis: .vertical)
                             .textInputAutocapitalization(.never)
-                        TextField("Notes", text: $values.notes, axis: .vertical)
+                        TextField("Notes", text: notesBinding, axis: .vertical)
                         Picker("Location", selection: $destination) {
                             ForEach(options) { option in
                                 Text(option.displayPath).tag(Optional(option.destination))
@@ -761,7 +762,7 @@ struct ThingManagementForm: View {
         .toolbar {
             editorToolbar(
                 save: save,
-                disabled: values.normalizedName.isEmpty || !hasValidDestination || isSaving || isAnalyzing,
+                disabled: values.normalizedName.isEmpty || !hasValidDestination || isSaving,
                 isCommitting: $isSaving
             )
         }
@@ -772,7 +773,7 @@ struct ThingManagementForm: View {
             isNameFocused = true
         }
         .onChange(of: options.map(\.destination)) { _, _ in reconcileDestination() }
-        .onDisappear { analysisRequestID = nil }
+        .onDisappear { invalidateAnalysis() }
         .confirmationDialog("Archive Thing?", isPresented: $confirmsArchive, titleVisibility: .visible) {
             Button("Archive Thing", role: .destructive) { beginArchive() }
         } message: {
@@ -803,6 +804,38 @@ struct ThingManagementForm: View {
         }
     }
 
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { values.name },
+            set: { newValue in
+                markEdited(.name)
+                values.name = newValue
+            })
+    }
+
+    private var keywordsBinding: Binding<String> {
+        Binding(
+            get: { values.keywords },
+            set: { newValue in
+                markEdited(.keywords)
+                values.keywords = newValue
+            })
+    }
+
+    private var notesBinding: Binding<String> {
+        Binding(
+            get: { values.notes },
+            set: { newValue in
+                markEdited(.notes)
+                values.notes = newValue
+            })
+    }
+
+    private func markEdited(_ field: ManagementAIEditableField) {
+        guard analysisRequestID != nil else { return }
+        editedFields.insert(field)
+    }
+
     private func beginAnalysisIfNeeded(_ selected: NormalizedPhoto) {
         guard ManagementAIDecision.afterSelectingPhoto(isCreating: thingID == nil) == .analyze else {
             return
@@ -810,6 +843,7 @@ struct ThingManagementForm: View {
         discardCurrentAISuggestions()
         let requestID = UUID()
         analysisRequestID = requestID
+        editedFields = []
         isAnalyzing = true
         analysisError = nil
         Task { await analyze(selected, requestID: requestID) }
@@ -819,7 +853,12 @@ struct ThingManagementForm: View {
         do {
             let suggestion = try await labelingService.suggestLabel(for: selected.photoInput)
             guard analysisRequestID == requestID else { return }
-            let application = ManagementAISuggestionApplication.apply(suggestion, to: values)
+            let application = ManagementAISuggestionApplication.apply(
+                suggestion,
+                to: values,
+                preserving: editedFields
+            )
+            analysisRequestID = nil
             values = application.values
             aiAppliedName = application.suppliedName ? values.normalizedName : nil
             aiAppliedKeywords =
@@ -827,16 +866,15 @@ struct ThingManagementForm: View {
             aiAppliedNotes = application.suppliedNotes ? values.normalizedNotes : nil
         } catch {
             guard analysisRequestID == requestID else { return }
+            analysisRequestID = nil
             analysisError = "AI labeling is unavailable. Enter the details manually."
         }
-        guard analysisRequestID == requestID else { return }
-        analysisRequestID = nil
+        guard analysisRequestID == nil else { return }
         isAnalyzing = false
     }
 
     private func discardCurrentAISuggestions() {
-        analysisRequestID = nil
-        isAnalyzing = false
+        invalidateAnalysis()
         analysisError = nil
         if let aiAppliedName, values.normalizedName == aiAppliedName {
             values.name = ""
@@ -852,7 +890,14 @@ struct ThingManagementForm: View {
         self.aiAppliedNotes = nil
     }
 
+    private func invalidateAnalysis() {
+        analysisRequestID = nil
+        isAnalyzing = false
+        editedFields = []
+    }
+
     private func save() async {
+        invalidateAnalysis()
         guard let destination, hasValidDestination else {
             isSaving = false
             return

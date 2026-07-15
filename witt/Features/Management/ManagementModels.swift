@@ -93,6 +93,12 @@ enum ManagementAIDecision: Hashable, Sendable {
     }
 }
 
+nonisolated enum ManagementAIEditableField: Hashable, Sendable {
+    case name
+    case keywords
+    case notes
+}
+
 struct ManagementAISuggestionApplication: Hashable, Sendable {
     let values: ManagementFormValues
     let suppliedName: Bool
@@ -101,14 +107,15 @@ struct ManagementAISuggestionApplication: Hashable, Sendable {
 
     static func apply(
         _ suggestion: ThingLabelSuggestion,
-        to currentValues: ManagementFormValues
+        to currentValues: ManagementFormValues,
+        preserving editedFields: Set<ManagementAIEditableField> = []
     ) -> Self {
         var values = currentValues
         var suppliedName = false
         var suppliedKeywords = false
         var suppliedNotes = false
 
-        if values.normalizedName.isEmpty {
+        if !editedFields.contains(.name), values.normalizedName.isEmpty {
             let proposedName = suggestion.proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
             if !proposedName.isEmpty {
                 values.name = proposedName
@@ -116,7 +123,7 @@ struct ManagementAISuggestionApplication: Hashable, Sendable {
             }
         }
 
-        if values.parsedKeywords.isEmpty {
+        if !editedFields.contains(.keywords), values.parsedKeywords.isEmpty {
             let keywords = ThingKeywordNormalizer.normalize(suggestion.keywords)
             if !keywords.isEmpty {
                 values.keywords = keywords.joined(separator: ", ")
@@ -124,7 +131,7 @@ struct ManagementAISuggestionApplication: Hashable, Sendable {
             }
         }
 
-        if values.normalizedNotes == nil,
+        if !editedFields.contains(.notes), values.normalizedNotes == nil,
             let detail = ManagementFormValues.optional(suggestion.detail ?? "")
         {
             values.notes = detail

@@ -45,7 +45,7 @@ The trailing Scan QR control is a first-class entry point for repeated catalogui
 
 ### Known QR
 
-Scanning a code already attached to a Storage Area or Container opens Add Thing for that destination. WITT offers the camera immediately, also permits choosing a photo, then analyzes the image and opens Review Thing. The user reviews or edits the proposed name, comma-separated keywords, and notes, confirms the location, and saves. If AI is unavailable, the flow remains usable with honest error messaging and manual entry.
+Scanning a code already attached to a Storage Area or Container opens Add Thing for that destination. WITT offers the camera immediately, also permits choosing a photo, then analyzes the image and opens Review Thing. Name, comma-separated keywords, and notes remain editable while analysis runs, and the user may save as soon as the normal form requirements are met. A late suggestion fills only fields the user has not touched. If AI is unavailable, the same form remains usable with honest error messaging, retry, and manual entry.
 
 ### Unknown QR
 
@@ -68,7 +68,7 @@ Creation is contextual:
 - A Storage Area offers New Container or New Thing.
 - A Container offers New Container or New Thing, including nested Containers.
 - New Storage Area and Container forms can optionally scan an unused QR label. Their detail screens keep QR assignment in the ellipsis menu rather than showing QR status in the content layer.
-- Management forms support create, edit, same-Place move, photo replacement or removal, and archive with impact confirmation.
+- Management forms support create, edit, same-Place move, photo replacement or removal, and archive with impact confirmation. Add Thing never blocks manual entry or a valid Save on AI analysis; late or stale analysis results cannot overwrite user edits.
 
 Storage Area details appear as secondary, noninteractive text immediately beneath the screen title rather than inside a grouped row that resembles a button. A native segmented control below the details switches between Things and Containers, defaults to Things, and shows the matching collection and contextual New tile.
 

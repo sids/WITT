@@ -276,13 +276,14 @@ struct ReviewThingView: View {
     let onSaved: () -> Void
     @Environment(\.thingPhotoLabelingService) private var labelingService
 
-    @State private var name = ""
-    @State private var keywords = ""
-    @State private var notes = ""
-    @State private var isAnalyzing = true
+    @State private var values = ManagementFormValues()
+    @State private var isAnalyzing = false
     @State private var isSaving = false
-    @State private var usedAISuggestion = false
+    @State private var analysisSucceeded = false
     @State private var analysisError: String?
+    @State private var analysisRequestID: UUID?
+    @State private var editedFields: Set<ManagementAIEditableField> = []
+    @State private var aiAppliedName: String?
 
     private var location: String {
         store.locationComponents(for: destination).joined(separator: " · ")
@@ -309,18 +310,17 @@ struct ReviewThingView: View {
                         Task { await analyzePhoto() }
                     }
                     .disabled(photo == nil)
-                } else if usedAISuggestion {
+                } else if analysisSucceeded {
                     Label("AI suggestion ready", systemImage: "sparkles")
                         .foregroundStyle(.tint)
                 }
             }
 
             Section("Thing") {
-                TextField("Name", text: $name)
-                TextField("Keywords", text: $keywords, axis: .vertical)
-                TextField("Notes", text: $notes, axis: .vertical)
+                TextField("Name", text: nameBinding)
+                TextField("Keywords", text: keywordsBinding, axis: .vertical)
+                TextField("Notes", text: notesBinding, axis: .vertical)
             }
-            .disabled(isAnalyzing)
 
             Section("Location") {
                 Label(location, systemImage: "location")
@@ -335,8 +335,7 @@ struct ReviewThingView: View {
                 }
                 .disabled(
                     isSaving
-                        || isAnalyzing
-                        || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || values.normalizedName.isEmpty
                 )
                 .accessibilityIdentifier("review.save")
             }
@@ -344,44 +343,96 @@ struct ReviewThingView: View {
         .task(id: photo) {
             await analyzePhoto()
         }
+        .onDisappear { invalidateAnalysis() }
+    }
+
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { values.name },
+            set: { newValue in
+                markEdited(.name)
+                values.name = newValue
+            })
+    }
+
+    private var keywordsBinding: Binding<String> {
+        Binding(
+            get: { values.keywords },
+            set: { newValue in
+                markEdited(.keywords)
+                values.keywords = newValue
+            })
+    }
+
+    private var notesBinding: Binding<String> {
+        Binding(
+            get: { values.notes },
+            set: { newValue in
+                markEdited(.notes)
+                values.notes = newValue
+            })
+    }
+
+    private func markEdited(_ field: ManagementAIEditableField) {
+        guard analysisRequestID != nil else { return }
+        editedFields.insert(field)
     }
 
     private func analyzePhoto() async {
         guard let photo else {
-            isAnalyzing = false
+            invalidateAnalysis()
             return
         }
 
+        let requestID = UUID()
+        analysisRequestID = requestID
+        editedFields = []
         isAnalyzing = true
+        analysisSucceeded = false
         analysisError = nil
         do {
             let suggestion = try await labelingService.suggestLabel(for: photo.photoInput)
-            guard !Task.isCancelled else { return }
-            name = suggestion.proposedName
-            keywords = suggestion.keywords.joined(separator: ", ")
-            notes = suggestion.detail ?? ""
-            usedAISuggestion = true
+            guard !Task.isCancelled, analysisRequestID == requestID else { return }
+            let application = ManagementAISuggestionApplication.apply(
+                suggestion,
+                to: values,
+                preserving: editedFields
+            )
+            analysisRequestID = nil
+            values = application.values
+            if application.suppliedName {
+                aiAppliedName = values.normalizedName
+            }
+            analysisSucceeded = true
         } catch is CancellationError {
-            return
+            guard analysisRequestID == requestID else { return }
+            analysisRequestID = nil
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, analysisRequestID == requestID else { return }
+            analysisRequestID = nil
             analysisError = "AI labeling is unavailable. You can enter the details manually."
         }
+        guard analysisRequestID == nil else { return }
         isAnalyzing = false
     }
 
+    private func invalidateAnalysis() {
+        analysisRequestID = nil
+        isAnalyzing = false
+        editedFields = []
+    }
+
     private func save() async {
+        invalidateAnalysis()
         isSaving = true
-        let parsedKeywords = keywords.split(separator: ",").map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        let nameWasAISupplied = aiAppliedName.map { $0 == values.normalizedName } == true
         let saved = await store.saveThing(
-            name: name,
-            keywords: parsedKeywords,
-            notes: notes,
+            name: values.normalizedName,
+            keywords: values.parsedKeywords,
+            notes: values.normalizedNotes ?? "",
             photo: photo,
             to: destination,
-            nameSource: usedAISuggestion ? "ai-reviewed" : "user"
+            nameSource: nameWasAISupplied ? "ai-reviewed" : "user"
         )
         isSaving = false
         if saved { onSaved() }
