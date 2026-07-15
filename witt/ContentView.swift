@@ -32,6 +32,33 @@ struct ContentView: View {
     }
 
     var body: some View {
+        rootContent
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--demo-qr-scanner") {
+            ScanView(
+                isPaused: false,
+                onClose: {},
+                onPayload: { _ in }
+            )
+        } else if ProcessInfo.processInfo.arguments.contains("--demo-camera-capture") {
+            CameraCaptureView(
+                onCancel: {},
+                onResult: { _ in },
+                onError: { _ in }
+            )
+        } else {
+            appContent
+        }
+#else
+        appContent
+#endif
+    }
+
+    private var appContent: some View {
         AppShellView(
             store: store,
             initialScan: initialScan,

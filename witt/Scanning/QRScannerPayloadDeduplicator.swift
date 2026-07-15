@@ -37,7 +37,8 @@ enum QRScannerState: Equatable, Sendable {
     case notDetermined
     case requesting
     case authorized
-    case deniedOrRestricted
+    case denied
+    case restricted
     case unavailable
     case running
     case failure(String)
@@ -47,7 +48,8 @@ struct QRScannerStateMachine: Sendable {
     enum Event: Equatable, Sendable {
         case requestAuthorization
         case authorizationGranted
-        case authorizationDeniedOrRestricted
+        case authorizationDenied
+        case authorizationRestricted
         case cameraUnavailable
         case sessionStarted
         case sessionStopped
@@ -62,8 +64,10 @@ struct QRScannerStateMachine: Sendable {
             state = .requesting
         case .authorizationGranted:
             state = .authorized
-        case .authorizationDeniedOrRestricted:
-            state = .deniedOrRestricted
+        case .authorizationDenied:
+            state = .denied
+        case .authorizationRestricted:
+            state = .restricted
         case .cameraUnavailable:
             state = .unavailable
         case .sessionStarted:

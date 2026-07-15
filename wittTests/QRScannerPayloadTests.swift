@@ -82,14 +82,34 @@ final class QRScannerPayloadTests: XCTestCase {
         XCTAssertEqual(stateMachine.state, .authorized)
     }
 
-    func testStateMachineCoversDeniedUnavailableAndFailure() {
+    func testStateMachineCoversDeniedRestrictedUnavailableAndFailure() {
         var stateMachine = QRScannerStateMachine()
 
-        stateMachine.handle(.authorizationDeniedOrRestricted)
-        XCTAssertEqual(stateMachine.state, .deniedOrRestricted)
+        stateMachine.handle(.authorizationDenied)
+        XCTAssertEqual(stateMachine.state, .denied)
+        stateMachine.handle(.authorizationRestricted)
+        XCTAssertEqual(stateMachine.state, .restricted)
         stateMachine.handle(.cameraUnavailable)
         XCTAssertEqual(stateMachine.state, .unavailable)
         stateMachine.handle(.failed("Configuration failed"))
         XCTAssertEqual(stateMachine.state, .failure("Configuration failed"))
+    }
+
+    func testStateMachineRecoversFromDeniedAuthorization() {
+        var stateMachine = QRScannerStateMachine()
+
+        stateMachine.handle(.authorizationDenied)
+        stateMachine.handle(.authorizationGranted)
+        XCTAssertEqual(stateMachine.state, .authorized)
+        stateMachine.handle(.sessionStarted)
+        XCTAssertEqual(stateMachine.state, .running)
+    }
+
+    func testStateMachineRecoversFromRestrictedAuthorization() {
+        var stateMachine = QRScannerStateMachine()
+
+        stateMachine.handle(.authorizationRestricted)
+        stateMachine.handle(.authorizationGranted)
+        XCTAssertEqual(stateMachine.state, .authorized)
     }
 }

@@ -1,13 +1,63 @@
+@preconcurrency import AVFoundation
 import SwiftUI
 import UIKit
 
+enum CameraAuthorizationState: Equatable, Sendable {
+    case notDetermined
+    case authorized
+    case denied
+    case restricted
+    case unavailable
+
+    init(isCameraAvailable: Bool, authorizationStatus: AVAuthorizationStatus) {
+        guard isCameraAvailable else {
+            self = .unavailable
+            return
+        }
+
+        switch authorizationStatus {
+        case .notDetermined:
+            self = .notDetermined
+        case .authorized:
+            self = .authorized
+        case .denied:
+            self = .denied
+        case .restricted:
+            self = .restricted
+        @unknown default:
+            self = .restricted
+        }
+    }
+
+    var offersSettingsRecovery: Bool {
+        self == .denied || self == .restricted
+    }
+
+#if DEBUG
+    static var demoOverride: CameraAuthorizationState? {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--demo-camera-denied") {
+            return .denied
+        }
+        if arguments.contains("--demo-camera-restricted") {
+            return .restricted
+        }
+        return nil
+    }
+#endif
+}
+
 public struct CameraCaptureView: View {
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+
     private let normalizer: PhotoNormalizer
     private let onCancel: () -> Void
     private let onResult: (NormalizedPhoto) -> Void
     private let onError: (Error) -> Void
 
-    @State private var reportedUnavailableCamera = false
+    @State private var authorizationState: CameraAuthorizationState = .notDetermined
+    @State private var isRequestingAuthorization = false
 
     public init(
         normalizer: PhotoNormalizer = PhotoNormalizer(),
@@ -23,7 +73,8 @@ public struct CameraCaptureView: View {
 
     public var body: some View {
         Group {
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            switch authorizationState {
+            case .authorized:
                 SystemCameraPicker(
                     normalizer: normalizer,
                     onCancel: onCancel,
@@ -31,21 +82,87 @@ public struct CameraCaptureView: View {
                     onError: onError
                 )
                 .ignoresSafeArea()
-            } else {
+            case .notDetermined:
+                ProgressView(
+                    isRequestingAuthorization
+                        ? "Requesting camera access"
+                        : "Checking camera access"
+                )
+            case .denied:
+                cameraAccessRecovery(
+                    title: "Camera Access Required",
+                    description: "Allow camera access in Settings to take photos."
+                )
+            case .restricted:
+                cameraAccessRecovery(
+                    title: "Camera Access Restricted",
+                    description: "Camera access is restricted by Screen Time or device management. Review your device settings or contact the device administrator."
+                )
+            case .unavailable:
                 ContentUnavailableView {
-                    Label("Camera Unavailable", systemImage: "camera.fill")
+                    Label("Camera Unavailable", systemImage: "camera.slash")
                 } description: {
-                    Text("Choose a photo from the library instead.")
+                    Text("This device does not have a camera available. Choose a photo from the library instead.")
                 } actions: {
                     Button("Cancel", action: onCancel)
-                }
-                .onAppear {
-                    guard !reportedUnavailableCamera else { return }
-                    reportedUnavailableCamera = true
-                    onError(CameraCaptureError.cameraUnavailable)
+                        .accessibilityIdentifier("cameraCapture.cancel")
                 }
             }
         }
+        .task {
+            await refreshAuthorization()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await refreshAuthorization()
+            }
+        }
+    }
+
+    private func cameraAccessRecovery(title: String, description: String) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: "camera.fill")
+        } description: {
+            Text(description)
+        } actions: {
+            Button("Open Settings", systemImage: "gear") {
+                guard authorizationState.offersSettingsRecovery,
+                      let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
+                    return
+                }
+                openURL(settingsURL)
+            }
+            .accessibilityIdentifier("cameraCapture.openSettings")
+
+            Button("Cancel", action: onCancel)
+                .accessibilityIdentifier("cameraCapture.cancel")
+        }
+    }
+
+    @MainActor
+    private func refreshAuthorization() async {
+#if DEBUG
+        if let demoOverride = CameraAuthorizationState.demoOverride {
+            authorizationState = demoOverride
+            return
+        }
+#endif
+
+        let currentState = CameraAuthorizationState(
+            isCameraAvailable: UIImagePickerController.isSourceTypeAvailable(.camera),
+            authorizationStatus: AVCaptureDevice.authorizationStatus(for: .video)
+        )
+        authorizationState = currentState
+
+        guard currentState == .notDetermined, !isRequestingAuthorization else { return }
+        isRequestingAuthorization = true
+        _ = await AVCaptureDevice.requestAccess(for: .video)
+        isRequestingAuthorization = false
+        authorizationState = CameraAuthorizationState(
+            isCameraAvailable: UIImagePickerController.isSourceTypeAvailable(.camera),
+            authorizationStatus: AVCaptureDevice.authorizationStatus(for: .video)
+        )
     }
 }
 

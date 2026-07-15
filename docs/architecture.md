@@ -91,9 +91,9 @@ The printing subsystem in [`QRPrinting`](../witt/QRPrinting) generates random, u
 
 ## Camera and scanner adapters
 
-Thing photo capture is isolated behind SwiftUI adapters in [`CameraCaptureView.swift`](../witt/Photos/CameraCaptureView.swift) and [`PhotoLibraryPicker.swift`](../witt/Photos/PhotoLibraryPicker.swift). The camera bridge wraps `UIImagePickerController`; library selection uses `PhotosPicker`. Both return `NormalizedPhoto` or a typed error to the flow and neither writes persistence directly.
+Thing photo capture is isolated behind SwiftUI adapters in [`CameraCaptureView.swift`](../witt/Photos/CameraCaptureView.swift) and [`PhotoLibraryPicker.swift`](../witt/Photos/PhotoLibraryPicker.swift). The camera bridge wraps `UIImagePickerController`; library selection uses `PhotosPicker`. Both return `NormalizedPhoto` or a typed error to the flow and neither writes persistence directly. `CameraAuthorizationState` maps AVFoundation authorization and hardware availability into explicit not-determined, authorized, denied, restricted, and unavailable states. Denied and restricted capture surfaces provide Open Settings and Cancel actions; foreground activation rechecks authorization so a newly granted permission resumes the picker.
 
-QR scanning is a separate AVFoundation pipeline. [`QRScannerSession`](../witt/Scanning/QRScannerSession.swift) owns camera input, metadata output, QR-only decoding, the serial session queue, torch changes, and start/stop intent. [`QRScannerView`](../witt/Scanning/QRScannerView.swift) owns permission and lifecycle presentation, pauses for inactive scenes or overlaid flows, updates preview rotation from interface orientation, and reports denied, unavailable, and failed states explicitly. `QRScannerPayloadDeduplicator` suppresses repeated reads of the same payload for 1.5 seconds by default and resets when the session stops.
+QR scanning is a separate AVFoundation pipeline. [`QRScannerSession`](../witt/Scanning/QRScannerSession.swift) owns camera input, metadata output, QR-only decoding, the serial session queue, torch changes, and start/stop intent. [`QRScannerView`](../witt/Scanning/QRScannerView.swift) owns permission and lifecycle presentation, pauses for inactive scenes or overlaid flows, updates preview rotation from interface orientation, and reports denied, restricted, unavailable, and failed states explicitly. Denied or restricted access provides Open Settings inside the scanner while its existing Close control remains available; returning to the foreground rechecks authorization before starting the session. `QRScannerPayloadDeduplicator` suppresses repeated reads of the same payload for 1.5 seconds by default and resets when the session stops.
 
 The scanner emits only strings. Payload interpretation, WITT deep-link validation, persistence resolution, and user routing remain outside AVFoundation, which keeps hardware behavior independently testable from QR semantics. In-app routing accepts any non-empty payload and preserves arbitrary identities exactly; only external WITT deep links require the strict versioned URL form. `QRAssignmentScanner` composes the same hardware view for Storage Area and Container creation and replacement, pauses during resolution, accepts an unknown payload or the target's existing identity, and keeps empty, already-attached, repair, and conflict errors local to the scanner.
 
@@ -117,14 +117,14 @@ Creation and editing are routed through `ManagementRoute` and one-screen forms i
 
 ## Testing seams and baseline
 
-The `wittTests` target currently passes 155 tests in Debug and 151 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
+The `wittTests` target currently passes 160 tests in Debug and 156 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, and QR mutations;
 - managed-object runtime class mappings, build-4 schema hashes, controlled model-contract failures, and SQLite Container reopen compatibility;
-- QR token/URL parsing, resolution, routing, duplicate scanner payloads, and scanner state transitions;
+- QR token/URL parsing, resolution, routing, duplicate scanner payloads, scanner state transitions, and denied/restricted authorization recovery;
 - fixed-sheet and continuous-roll label geometry, physical margins/gaps, square and rectangular content rules, pagination, PDF dimensions, quiet zones, crisp rendering, and failure paths;
-- photo orientation, resizing, metadata stripping, thumbnail generation, and persistence;
+- camera authorization mapping and recovery policy, plus photo orientation, resizing, metadata stripping, thumbnail generation, and persistence;
 - AI protocol mocks, Responses-compatible request/response handling, configuration selection, and error mapping;
 - management preselection, AI suggestion application, post-save dismissal handoffs, exact destination reconstruction, archive facts, catalog presentation, and Place-sharing helpers.
 

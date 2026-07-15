@@ -1,3 +1,4 @@
+import AVFoundation
 import ImageIO
 import UIKit
 import UniformTypeIdentifiers
@@ -5,6 +6,40 @@ import XCTest
 @testable import witt
 
 final class PhotoPipelineTests: XCTestCase {
+    func testCameraAuthorizationStateMapsEverySystemStatus() {
+        XCTAssertEqual(
+            CameraAuthorizationState(isCameraAvailable: true, authorizationStatus: .notDetermined),
+            .notDetermined
+        )
+        XCTAssertEqual(
+            CameraAuthorizationState(isCameraAvailable: true, authorizationStatus: .authorized),
+            .authorized
+        )
+        XCTAssertEqual(
+            CameraAuthorizationState(isCameraAvailable: true, authorizationStatus: .denied),
+            .denied
+        )
+        XCTAssertEqual(
+            CameraAuthorizationState(isCameraAvailable: true, authorizationStatus: .restricted),
+            .restricted
+        )
+    }
+
+    func testUnavailableCameraTakesPriorityOverAuthorization() {
+        XCTAssertEqual(
+            CameraAuthorizationState(isCameraAvailable: false, authorizationStatus: .authorized),
+            .unavailable
+        )
+    }
+
+    func testSettingsRecoveryIsOfferedOnlyForDeniedAndRestrictedAccess() {
+        XCTAssertTrue(CameraAuthorizationState.denied.offersSettingsRecovery)
+        XCTAssertTrue(CameraAuthorizationState.restricted.offersSettingsRecovery)
+        XCTAssertFalse(CameraAuthorizationState.notDetermined.offersSettingsRecovery)
+        XCTAssertFalse(CameraAuthorizationState.authorized.offersSettingsRecovery)
+        XCTAssertFalse(CameraAuthorizationState.unavailable.offersSettingsRecovery)
+    }
+
     func testNormalizerCapsLongEdgeAndCreatesThumbnail() throws {
         let inputData = try makeJPEG(width: 3_000, height: 1_500)
         let normalized = try PhotoNormalizer().normalize(

@@ -85,7 +85,11 @@ Workflow:
   - [x] Apply late AI suggestions only to fields the user has not already filled or changed; never overwrite manual input.
   - [x] Ignore stale AI results after save, dismissal, photo replacement, or photo removal, while preserving honest failure and retry states.
   - [x] Verified 11 focused state tests, all 151 Debug tests, all 147 Release-optimized tests, and iOS 26 simulator screenshots covering active analysis and unavailable manual-entry states in both creation paths.
-- [ ] UX-003 - Add actionable camera-denied recovery, including Open Settings; decide whether manual QR entry belongs in the first release.
+- [x] UX-003 - Add actionable camera-denied recovery; manual QR entry is deferred from the first release. Completed July 15, 2026.
+  - [x] When camera permission is denied, QR scanning and photo capture show accurate native recovery copy with an Open Settings action and a clear way back.
+  - [x] Restricted and unavailable camera states explain the limitation without implying that permission can always be changed.
+  - [x] Returning from Settings refreshes authorization and resumes the requested camera flow when access has been granted.
+  - [x] Verified 20 focused permission/photo/scanner tests, all 160 Debug tests, all 156 Release-optimized tests, clean simulator builds, and iOS 26 simulator renders of both denied-camera surfaces.
 - [ ] QR-001 - Decide whether a Storage Area or Container can have multiple QR codes. Align data rules, eligible-target queries, binding UI, conflict behavior, and docs.
 - [ ] QR-002 - Turn `needsRepair` and QR conflict alerts into a complete repair flow for archived, missing, or multiply bound targets.
 - [ ] SEARCH-001 - Decide the scope and prominence of duplicate-Thing detection; implement only if it materially helps cataloging.

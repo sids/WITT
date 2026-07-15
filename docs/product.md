@@ -43,6 +43,8 @@ Place
 
 The trailing Scan QR control is a first-class entry point for repeated cataloguing while moving around a home. The in-app scanner accepts any QR code with a non-empty payload. WITT also handles its own versioned `witt://` links when another scanner or camera app opens them directly.
 
+The first release keeps QR identity camera-first and does not provide manual payload entry. When camera access is denied, WITT offers a direct Open Settings recovery action and a clear way back; returning after granting access resumes the requested scanner or photo-capture flow. Restricted or unavailable cameras are described accurately without suggesting that permission can always be changed.
+
 ### Known QR
 
 Scanning a code already attached to a Storage Area or Container opens Add Thing for that destination. WITT offers the camera immediately, also permits choosing a photo, then analyzes the image and opens Review Thing. Name, comma-separated keywords, and notes remain editable while analysis runs, and the user may save as soon as the normal form requirements are met. A late suggestion fills only fields the user has not touched. If AI is unavailable, the same form remains usable with honest error messaging, retry, and manual entry.
@@ -117,6 +119,7 @@ The iPhone experience prioritizes quick, linear movement through capture and det
 ## MVP Non-Goals
 
 - QR codes for Rooms or Things.
+- Manual entry of QR payloads.
 - Barcode-based stock control, quantities, pricing, procurement, or warehouse workflows.
 - Public catalogues or sharing below the Place level.
 - Fully automatic AI saves without user review.
