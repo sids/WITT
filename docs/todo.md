@@ -22,6 +22,7 @@ Workflow:
 ## Feedback Inbox
 
 - [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (7)`. Close when Sid considers the review pass complete.
+- [ ] TF-003 - Add Divya to `WITT Internal` for the two-account sharing spike. Sid grants her WITT app visibility in App Store Connect while retaining her current apps and SALES role; Codex then sends and verifies the TestFlight group invitation.
 - [x] FB-018 - Sid, July 12, 2026, build `1.0 (4)`: Tighten the Room grid's horizontal margins so its tiles extend as far as the current New Room action. Make New Room a tile inside the two-column grid with a restrained dashed border. In the empty state, use the same dashed New Room tile but keep it centered rather than stretching it across the screen. Verified populated and empty states on iPhone; the adaptive two-column structure is unchanged on iPad.
 - [x] FB-019 - Sid, July 12, 2026, build `1.0 (4)`: Fix Room navigation selecting a stale saved destination. Explicit Room taps now atomically replace a restored path, while launch restoration remains intact. Verified by three regression tests and by restoring a deep Garage path, backing to Home, selecting Home Office, and returning to Home.
 - [x] FB-020 - Sid, July 12, 2026, build `1.0 (4)`: Make New Storage Area a full Storage Area list-sized action row with a restrained dashed border, in both empty and populated Room states. Verified on populated Garage and empty Home Office screens.
