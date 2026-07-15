@@ -112,6 +112,8 @@ Workflow:
 
 - [ ] CLOUD-004 - Add restrained CloudKit sync diagnostics after the sharing spike identifies useful failure signals.
 - [ ] PHOTO-001 - Profile camera and photo-library ingestion during long physical sessions; optimize normalization, thumbnails, and memory use if evidence requires it.
+  - [x] Profiled five 4032 x 3024 normalization passes on an iOS 26 simulator. The existing Image I/O path averaged 61.04 ms wall time and 173,441 kB peak physical memory; two alternative thumbnail paths were 4.3-5% worse in memory and were rejected. Photo-library work is now lifecycle-bound, prevents reselection while active, checks cancellation, and suppresses stale callbacks. Eight focused tests cover normalization and thumbnail metadata privacy.
+  - [ ] Repeat full-resolution camera and iCloud-library ingestion on physical devices, including dismiss/reopen during loading, memory warnings, sustained sessions, and thermal pressure; simulator tooling could not produce a trustworthy leak graph.
 - [x] QR-003 - Retire `QRCode.lastScannedAt` from runtime behavior while retaining the optional deployed model attribute for additive CloudKit compatibility. QR resolution stays read-only and preserves legacy values without creating scan-history writes. Verified July 15, 2026 with 47 focused repository and persistence tests.
 - [ ] TEST-001 - Add focused regression tests with each feedback fix and keep the full simulator suite green.
 

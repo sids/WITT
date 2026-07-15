@@ -25,10 +25,12 @@ public struct PhotoLibraryPicker<Label: View>: View {
         PhotosPicker(selection: $selection, matching: .images) {
             label
         }
-        .onChange(of: selection) { _, item in
+        .disabled(selection != nil)
+        .task(id: selection) {
+            let item = selection
             guard let item else { return }
-            Task {
-                await loadAndNormalize(item)
+            await loadAndNormalize(item)
+            if selection == item {
                 selection = nil
             }
         }
@@ -39,6 +41,7 @@ public struct PhotoLibraryPicker<Label: View>: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw PhotoLibraryPickerError.imageDataUnavailable
             }
+            try Task.checkCancellation()
             let capturedPhoto = CapturedPhoto(
                 data: data,
                 contentType: item.supportedContentTypes.first?.identifier
@@ -49,7 +52,10 @@ public struct PhotoLibraryPicker<Label: View>: View {
             let normalizedPhoto = try await Task.detached(priority: .userInitiated) {
                 try normalizer.normalize(capturedPhoto)
             }.value
+            try Task.checkCancellation()
             onResult(normalizedPhoto)
+        } catch is CancellationError {
+            return
         } catch {
             onError(error)
         }

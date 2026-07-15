@@ -96,6 +96,11 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(outputProperties[kCGImagePropertyOrientation])
         let outputEXIF = outputProperties[kCGImagePropertyExifDictionary] as? NSDictionary
         XCTAssertNil(outputEXIF?[kCGImagePropertyExifUserComment as String])
+
+        let thumbnailProperties = try imageProperties(of: normalized.thumbnailJPEGData)
+        XCTAssertNil(thumbnailProperties[kCGImagePropertyOrientation])
+        let thumbnailEXIF = thumbnailProperties[kCGImagePropertyExifDictionary] as? NSDictionary
+        XCTAssertNil(thumbnailEXIF?[kCGImagePropertyExifUserComment as String])
     }
 
     func testAIInputAndPersistenceMetadataUseNormalizedValues() throws {
