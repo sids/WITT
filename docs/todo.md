@@ -43,6 +43,7 @@ Workflow:
 
 - [ ] CLOUD-001 - Deploy or verify the production schema for `iCloud.in.sids.witt` before relying on synced or shared TestFlight data.
 - [ ] CLOUD-002 - Run the real-device, two-iCloud-account Place-sharing spike.
+  - Execution runbook and evidence record: [sharing-spike.md](sharing-spike.md).
   - [ ] Use two physical devices signed into different iCloud accounts.
   - [ ] Account A creates a Place graph containing Room, Storage Area, Container, Thing, keywords, QR binding, Place photo, thumbnail, and a realistic normalized Thing photo.
   - [ ] Account A shares the Place read/write; Account B accepts the invitation.
