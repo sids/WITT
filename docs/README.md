@@ -13,6 +13,7 @@ This directory is the canonical home for WITT product, technical, planning, and 
 - [Status](status.md) - concise implementation snapshot and verification baseline.
 - [Release](release.md) - App Store Connect facts and repeatable TestFlight/App Store release process.
 - [App Store Packaging](app-store.md) - draft listing copy, review notes, screenshot story/runbook, and privacy-questionnaire mapping.
+- [App Icon Concepts](app-icon-concepts.md) - three review directions, recommendation, and the production pass after approval.
 - [Place Sharing Spike](sharing-spike.md) - repeatable two-account fixture, measurements, and evidence for the CloudKit sharing release gate.
 
 ## Documentation Rules

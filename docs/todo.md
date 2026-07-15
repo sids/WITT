@@ -127,6 +127,9 @@ Workflow:
 ## P2 - App Store Release
 
 - [ ] RELEASE-001 - Replace the provisional app icon with an approved production icon.
+  - [x] Generated and reviewed three distinct flattened concept directions in [app-icon-concepts.md](app-icon-concepts.md). Direction B, Storage Stack, is recommended for refinement; the shipping asset remains unchanged.
+  - [ ] Sid selects a direction or requests another concept round.
+  - [ ] Redraw the selected mark as clean editable layers, compose and tune system appearance variants in Icon Composer, and verify real-size rendering before replacing `AppIcon`.
 - [ ] RELEASE-002 - Prepare App Store metadata, screenshots, privacy/support URLs, App Privacy answers, age rating, category, description, keywords, and review notes.
   - [x] Drafted the listing alternatives, subtitle, promotional text, description, keywords, categories, review notes, screenshot story, fixture guidance, and code-grounded App Privacy mapping in [app-store.md](app-store.md). Metadata lengths were checked against Apple's July 15, 2026 limits.
   - [x] Added a non-destructive screenshot pipeline that preserves Simulator data and CloudKit entitlements. Its syntax, help, presets, iOS 26 build, install, debug launch, and full-resolution PNG capture were exercised end to end.
