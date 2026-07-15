@@ -141,7 +141,7 @@ public final class QRCode: NSManagedObject {
     @NSManaged public var createdAt: Date?
     @NSManaged public var updatedAt: Date?
     @NSManaged public var boundAt: Date?
-    @NSManaged public var lastScannedAt: Date?
+    // `lastScannedAt` remains only in the deployed model for CloudKit schema compatibility.
     @NSManaged public var place: Place?
     @NSManaged public var area: Area?
     @NSManaged public var container: Container?

@@ -132,6 +132,16 @@ final class PersistenceControllerTests: XCTestCase {
         }
     }
 
+    func testRetiredQRCodeLastScannedAtRemainsAnOptionalDateInTheDeployedModel() throws {
+        let model = PersistenceController.inMemory().container.managedObjectModel
+        let qrCode = try XCTUnwrap(model.entitiesByName["QRCode"])
+        let attribute = try XCTUnwrap(qrCode.attributesByName["lastScannedAt"])
+
+        XCTAssertEqual(attribute.attributeType, .dateAttributeType)
+        XCTAssertTrue(attribute.isOptional)
+        XCTAssertFalse(attribute.isTransient)
+    }
+
     func testProductionInsertionHelperCreatesEveryManagedObjectClass() throws {
         let context = PersistenceController.inMemory().viewContext
         let place: Place = try CoreDataCatalogRepository.insert("Place", into: context)

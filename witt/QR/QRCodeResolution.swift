@@ -94,5 +94,6 @@ public struct QRCodeRepairRoute: Hashable, Sendable {
 }
 
 public protocol QRCodeResolving: Sendable {
+    /// Looks up the current binding without persisting scan or access activity.
     func resolve(_ token: QRToken) async throws -> QRCodeResolution
 }

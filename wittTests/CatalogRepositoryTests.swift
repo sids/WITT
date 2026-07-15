@@ -78,6 +78,37 @@ final class CatalogRepositoryTests: XCTestCase {
         XCTAssertFalse(remainingTargets.contains { $0.id == area.id })
     }
 
+    func testResolveLeavesRetiredScanMetadataUnsetAndPreservesLegacyValues() async throws {
+        let (repository, persistence, place) = try await makeSampleRepository()
+        let area = try XCTUnwrap(place.areas.first)
+        let token = try QRToken.generate()
+        let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
+
+        _ = try await repository.bindQRCode(.init(token: token, target: target))
+
+        let legacyValue = Date(timeIntervalSince1970: 1_700_000_000)
+        let context = persistence.viewContext
+        try await context.perform {
+            let rows = try Self.qrRows(token: token, in: context)
+            XCTAssertEqual(rows.count, 1)
+            let row = try XCTUnwrap(rows.first)
+            XCTAssertNil(row.value(forKey: "lastScannedAt"))
+            row.setValue(legacyValue, forKey: "lastScannedAt")
+            try context.save()
+        }
+
+        let resolution = try await repository.resolve(token)
+
+        XCTAssertEqual(resolution, .knownArea(QRTargetID(rawValue: area.id)))
+        let verificationContext = persistence.newBackgroundContext(author: "witt.catalog.qr-retired-scan-metadata")
+        try await verificationContext.perform {
+            let rows = try Self.qrRows(token: token, in: verificationContext)
+            XCTAssertEqual(rows.count, 1)
+            let row = try XCTUnwrap(rows.first)
+            XCTAssertEqual(row.value(forKey: "lastScannedAt") as? Date, legacyValue)
+        }
+    }
+
     func testArbitraryPayloadBindsAndResolvesByExactIdentity() async throws {
         let (repository, _, place) = try await makeSampleRepository()
         let area = try XCTUnwrap(place.areas.first)

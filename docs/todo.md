@@ -111,7 +111,7 @@ Workflow:
 
 - [ ] CLOUD-004 - Add restrained CloudKit sync diagnostics after the sharing spike identifies useful failure signals.
 - [ ] PHOTO-001 - Profile camera and photo-library ingestion during long physical sessions; optimize normalization, thumbnails, and memory use if evidence requires it.
-- [ ] QR-003 - Decide whether `QRCode.lastScannedAt` should become maintained product metadata or be removed.
+- [x] QR-003 - Retire `QRCode.lastScannedAt` from runtime behavior while retaining the optional deployed model attribute for additive CloudKit compatibility. QR resolution stays read-only and preserves legacy values without creating scan-history writes. Verified July 15, 2026 with 47 focused repository and persistence tests.
 - [ ] TEST-001 - Add focused regression tests with each feedback fix and keep the full simulator suite green.
 
 ## P2 - App Store Release
