@@ -171,9 +171,11 @@ struct QRCodePrintingView: View {
                 )
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
-                .frame(width: 72)
+                .frame(minWidth: 72)
+                .accessibilityLabel(title)
                 Text("mm")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
         }
     }

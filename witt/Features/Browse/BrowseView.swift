@@ -453,6 +453,7 @@ struct BrowseView: View {
 }
 
 private struct PlaceListView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var store: CatalogStore
     let place: PlaceSnapshot
     let onSharePlace: (UUID) -> Void
@@ -478,11 +479,16 @@ private struct PlaceListView: View {
                         HStack {
                             Spacer(minLength: 0)
                             newRoomButton(placeID: place.id)
-                                .frame(width: (proxy.size.width - 12) / 2)
+                                .frame(
+                                    width: BrowseGridLayout.columnWidth(
+                                        availableWidth: proxy.size.width,
+                                        dynamicTypeSize: dynamicTypeSize
+                                    )
+                                )
                             Spacer(minLength: 0)
                         }
                     }
-                    .frame(height: 92)
+                    .frame(height: dynamicTypeSize.isAccessibilitySize ? 112 : 92)
                     .listRowInsets(
                         EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0)
                     )
@@ -491,7 +497,7 @@ private struct PlaceListView: View {
                 }
             } else {
                 Section("Rooms") {
-                    TwoColumnBrowseGrid {
+                    AdaptiveBrowseGrid {
                         ForEach(place.activeRooms) { room in
                             Button {
                                 onSelectRoom(room.id)
@@ -596,7 +602,7 @@ struct RoomDetailView: View {
                     }
                     if !things.isEmpty {
                         Section("Things") {
-                            TwoColumnBrowseGrid {
+                            AdaptiveBrowseGrid {
                                 ForEach(things) { thing in
                                     NavigationLink(value: BrowseRoute.thing(thing.id)) {
                                         ThingMediaTile(thing: thing)
@@ -609,7 +615,7 @@ struct RoomDetailView: View {
                     }
                     if !containers.isEmpty {
                         Section("Containers") {
-                            TwoColumnBrowseGrid {
+                            AdaptiveBrowseGrid {
                                 ForEach(containers) { container in
                                     NavigationLink(value: BrowseRoute.container(container.id)) {
                                         ContainerMediaTile(
@@ -711,7 +717,7 @@ private struct AreaDetailView: View {
                         let things = place.activeThings(in: .area(area.id))
                         let containers = place.activeContainers(inArea: area.id)
                         if contentSelection == .things {
-                            TwoColumnBrowseGrid {
+                            AdaptiveBrowseGrid {
                                 ForEach(things) { thing in
                                     NavigationLink(value: BrowseRoute.thing(thing.id)) {
                                         ThingMediaTile(thing: thing)
@@ -728,7 +734,7 @@ private struct AreaDetailView: View {
                             }
                             .browseGridListRow()
                         } else {
-                            TwoColumnBrowseGrid {
+                            AdaptiveBrowseGrid {
                                 ForEach(containers) { container in
                                     NavigationLink(value: BrowseRoute.container(container.id)) {
                                         ContainerMediaTile(
@@ -807,7 +813,7 @@ private struct ContainerDetailView: View {
                     let things = place.activeThings(in: .container(container.id))
                     let children = place.childContainers(of: container.id)
                     Section("Things") {
-                        TwoColumnBrowseGrid {
+                        AdaptiveBrowseGrid {
                             ForEach(things) { thing in
                                 NavigationLink(value: BrowseRoute.thing(thing.id)) {
                                     ThingMediaTile(thing: thing)
@@ -825,7 +831,7 @@ private struct ContainerDetailView: View {
                         .browseGridListRow()
                     }
                     Section("Containers") {
-                        TwoColumnBrowseGrid {
+                        AdaptiveBrowseGrid {
                             ForEach(children) { child in
                                 NavigationLink(value: BrowseRoute.container(child.id)) {
                                     ContainerMediaTile(
@@ -902,22 +908,42 @@ private struct CatalogLocationSummary: View {
     }
 }
 
-private struct TwoColumnBrowseGrid<Content: View>: View {
+enum BrowseGridLayout {
+    static let spacing: CGFloat = 12
+
+    static func columnCount(for dynamicTypeSize: DynamicTypeSize) -> Int {
+        dynamicTypeSize.isAccessibilitySize ? 1 : 2
+    }
+
+    static func columnWidth(
+        availableWidth: CGFloat,
+        dynamicTypeSize: DynamicTypeSize
+    ) -> CGFloat {
+        let count = CGFloat(columnCount(for: dynamicTypeSize))
+        return (availableWidth - spacing * (count - 1)) / count
+    }
+}
+
+private struct AdaptiveBrowseGrid<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let content: Content
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-    ]
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
+        LazyVGrid(columns: columns, spacing: BrowseGridLayout.spacing) {
             content
         }
         .navigationLinkIndicatorVisibility(.hidden)
+    }
+
+    private var columns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(), spacing: BrowseGridLayout.spacing),
+            count: BrowseGridLayout.columnCount(for: dynamicTypeSize)
+        )
     }
 }
 

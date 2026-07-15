@@ -1,7 +1,20 @@
+import SwiftUI
 import XCTest
 @testable import witt
 
 final class CatalogPresentationTests: XCTestCase {
+    func testBrowseGridUsesOneColumnAtAccessibilityTextSizes() {
+        XCTAssertEqual(BrowseGridLayout.columnCount(for: .large), 2)
+        XCTAssertEqual(BrowseGridLayout.columnCount(for: .accessibility1), 1)
+        XCTAssertEqual(
+            BrowseGridLayout.columnWidth(
+                availableWidth: 320,
+                dynamicTypeSize: .accessibility5
+            ),
+            320
+        )
+    }
+
     func testBrowseRouteEncodesAndDecodesEveryDestination() throws {
         let id = UUID()
         let routes: [BrowseRoute] = [

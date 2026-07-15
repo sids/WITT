@@ -390,6 +390,7 @@ struct ReviewThingView: View {
                         .scaledToFit()
                         .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 260)
                         .clipShape(.rect(cornerRadius: 6))
+                        .accessibilityLabel("Selected Thing photo")
                 }
             }
 

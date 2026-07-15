@@ -68,6 +68,7 @@ Workflow:
   - [ ] Evaluate naming, keywords, details, refusal, irrelevant text, latency, offline behavior, and manual fallback.
   - [ ] Enable the remote service in a release build only after the evaluation passes.
 - [ ] QA-001 - Complete physical-device cataloging and accessibility QA on iPhone and iPad.
+  - [x] Completed the autonomous iOS 26 simulator audit on iPhone and iPad at standard and Accessibility XXXL sizes with increased contrast. Browse grids now use one column at accessibility sizes, Review Thing photos have explicit VoiceOver labels, and QR-paper numeric fields have stable labels and scalable widths. Verified with 27 focused tests, clean builds, and review screenshots; physical VoiceOver order, hardware keyboard, split view, camera, and real-photo contrast remain below.
   - [ ] Exercise first launch, Browse, Search, known QR, unknown QR, add/edit/move/archive, photo replacement, print/share, deep links, and Place sharing.
   - [ ] Print labels and catalogue at least 10 real Things in one moving-around-the-home session; record taps, typing, delay, and navigation friction.
   - [ ] Verify camera/Photos permissions, denied/restricted recovery, torch, background/foreground transitions, interruption, offline launch, and sync-pending states.
