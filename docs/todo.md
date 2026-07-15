@@ -121,6 +121,12 @@ Workflow:
 
 - [ ] RELEASE-001 - Replace the provisional app icon with an approved production icon.
 - [ ] RELEASE-002 - Prepare App Store metadata, screenshots, privacy/support URLs, App Privacy answers, age rating, category, description, keywords, and review notes.
+  - [x] Drafted the listing alternatives, subtitle, promotional text, description, keywords, categories, review notes, screenshot story, fixture guidance, and code-grounded App Privacy mapping in [app-store.md](app-store.md). Metadata lengths were checked against Apple's July 15, 2026 limits.
+  - [x] Added a non-destructive screenshot pipeline that preserves Simulator data and CloudKit entitlements. Its syntax, help, presets, iOS 26 build, install, debug launch, and full-resolution PNG capture were exercised end to end.
+  - [ ] Choose an available final App Store name and replace the listing placeholder.
+  - [ ] Publish and approve the public support and privacy-policy destinations, including the final AI disclosure if AI ships.
+  - [ ] Create the fictional catalog fixture and capture, curate, and inspect the final iPhone and iPad screenshot sets at Apple's required sizes.
+  - [ ] Reconcile the archived binary and production services with the live App Privacy and age-rating questionnaires, then enter the approved metadata in App Store Connect.
 - [ ] RELEASE-003 - Archive with an Apple-accepted stable Xcode before App Store submission if the beta toolchain is no longer accepted.
 - [ ] RELEASE-004 - Complete final release-device, CloudKit, AI, privacy, accessibility, and data-loss checks before submitting version 1.0.
 

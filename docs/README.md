@@ -10,6 +10,7 @@ This directory is the canonical home for WITT product, technical, planning, and 
 - [Todo](todo.md) - the only live backlog and TestFlight feedback inbox.
 - [Status](status.md) - concise implementation snapshot and verification baseline.
 - [Release](release.md) - App Store Connect facts and repeatable TestFlight/App Store release process.
+- [App Store Packaging](app-store.md) - draft listing copy, review notes, screenshot story/runbook, and privacy-questionnaire mapping.
 - [Place Sharing Spike](sharing-spike.md) - repeatable two-account fixture, measurements, and evidence for the CloudKit sharing release gate.
 
 ## Documentation Rules
