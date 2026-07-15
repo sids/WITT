@@ -72,7 +72,7 @@ The repo now contains the seventh integrated implementation milestone:
 
 The production UI and AI transport seam are integrated. Live AI activation still requires a WITT-owned relay or another secure short-lived credential strategy, plus a chosen model and privacy policy; never ship a long-lived provider API key in the iOS app. The next product-critical validation is the real-device, two-iCloud-account sharing spike, especially `PhotoAsset` binary transfer and bidirectional edits.
 
-Version 1.0 build 7, sourced from commit `d723e9e`, is `IN_BETA_TESTING` through the `WITT Internal` TestFlight group with auto-notify enabled. It includes arbitrary QR payload support and the latest Browse creation-control polish, and supersedes build 6. Its App Store Connect build ID is `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3`; FB-024 remains open only until Sid confirms manual Container creation on the affected iPhone. Put all review feedback into [`docs/todo.md`](docs/todo.md) before dispatching fixes.
+Version 1.0 build 7, sourced from commit `d723e9e`, is `IN_BETA_TESTING` through the `WITT Internal` TestFlight group with auto-notify enabled. It includes arbitrary QR payload support and the latest Browse creation-control polish, and supersedes build 6. Its App Store Connect build ID is `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3`; Sid confirmed on July 15, 2026 that Container creation, persistence, reopening, and relaunch all succeed on the iPhone affected by the build-4 crash, completing FB-024. Put all review feedback into [`docs/todo.md`](docs/todo.md) before dispatching fixes.
 
 ## Working Model For Codex Threads
 

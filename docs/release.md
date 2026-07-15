@@ -14,7 +14,7 @@ This page records durable distribution facts and the repeatable release process.
 | Current TestFlight build | 1.0 (7) |
 | Source commit | `d723e9e` |
 | App Store Connect build ID | `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3` |
-| Build state | `IN_BETA_TESTING` in `WITT Internal` with auto-notify enabled; FB-024 awaits confirmation on the affected device |
+| Build state | `IN_BETA_TESTING` in `WITT Internal` with auto-notify enabled; FB-024 affected-device verification complete |
 | Xcode / SDK | Xcode 27.0 (`27A5218g`) / iOS 27.0 |
 | Minimum OS | iOS 26 |
 | Non-exempt encryption | No |
@@ -23,7 +23,7 @@ This page records durable distribution facts and the repeatable release process.
 
 | Build | Source | App Store Connect ID | Internal state | Verification |
 | --- | --- | --- | --- | --- |
-| 1.0 (7) | `d723e9e` | `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3` | `IN_BETA_TESTING` in `WITT Internal` | 145 simulator tests in Debug and clean Release-optimized configurations; arbitrary QR payload support and Browse creation-control polish; production CloudKit/push/TestFlight entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 executable/dSYM UUID `8802BEB9-138D-3CCA-BAF0-C4E153AAA3E0`; What to Test and internal-group relationship verified; affected-device Container confirmation pending |
+| 1.0 (7) | `d723e9e` | `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3` | `IN_BETA_TESTING` in `WITT Internal` | 145 simulator tests in Debug and clean Release-optimized configurations; arbitrary QR payload support and Browse creation-control polish; production CloudKit/push/TestFlight entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 executable/dSYM UUID `8802BEB9-138D-3CCA-BAF0-C4E153AAA3E0`; What to Test and internal-group relationship verified; on July 15, 2026, the affected iPhone successfully created, saved, reopened, and retained a Container across relaunch, completing FB-024 |
 | 1.0 (6) | `66fe38f` | `fdd162af-54ce-4cc4-967c-eb6296dc9966` | `IN_BETA_TESTING` in `WITT Internal` | 134 simulator tests in Debug and Release-optimized configurations; production CloudKit/push/TestFlight entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 dSYM; What to Test and internal-group relationship verified; affected-device Container confirmation pending |
 | 1.0 (5) | `f34fead` | `f7c85715-461d-427b-ab52-72a0aab6aeb7` | `IN_BETA_TESTING` in `WITT Internal` | 132 simulator tests in Debug and Release-optimized configurations; release Container persistence regression; build-4 store compatibility; production CloudKit/push entitlements; matching dSYM; What to Test verified; affected-device confirmation pending |
 | 1.0 (4) | `28433e3` | `54bf071a-76d5-4829-9067-326f003da172` | `IN_BETA_TESTING` in `WITT Internal` | 125 simulator tests; iPhone/iPad Browse and Search checks; production CloudKit/push entitlements; What to Test verified |
