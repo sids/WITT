@@ -137,6 +137,10 @@ public final class PersistenceController: NSObject {
             }
             isLoaded = loadedCount == expectedCount
         }
+
+#if DEBUG
+        initializeCloudKitSchemaIfRequested()
+#endif
     }
 
     private func configureContexts() {
@@ -234,6 +238,69 @@ public final class PersistenceController: NSObject {
         }
         return value
     }
+
+#if DEBUG
+    enum CloudKitSchemaInitializationRequest: Equatable {
+        case dryRun
+        case initialize
+
+        static func requested(in arguments: [String]) -> Self? {
+            if arguments.contains("--initialize-cloudkit-schema") {
+                return .initialize
+            }
+            if arguments.contains("--initialize-cloudkit-schema-dry-run") {
+                return .dryRun
+            }
+            return nil
+        }
+
+        var options: NSPersistentCloudKitContainerSchemaInitializationOptions {
+            switch self {
+            case .dryRun:
+                [.dryRun, .printSchema]
+            case .initialize:
+                [.printSchema]
+            }
+        }
+
+        var logName: String {
+            switch self {
+            case .dryRun:
+                "DRY RUN"
+            case .initialize:
+                "INITIALIZE"
+            }
+        }
+    }
+
+    private func initializeCloudKitSchemaIfRequested(
+        arguments: [String] = ProcessInfo.processInfo.arguments
+    ) {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            return
+        }
+        guard let request = CloudKitSchemaInitializationRequest.requested(in: arguments) else {
+            return
+        }
+
+        let prefix = "=== WITT CLOUDKIT SCHEMA \(request.logName) ==="
+        guard usesCloudKit, isLoaded, loadError == nil else {
+            let message = "\(prefix) FAILURE: CloudKit-backed stores did not load successfully: \(String(describing: loadError))"
+            NSLog("%@", message)
+            fatalError(message)
+        }
+
+        NSLog("%@ STARTING", prefix)
+        do {
+            try container.initializeCloudKitSchema(options: request.options)
+            NSLog("%@ SUCCESS", prefix)
+        } catch {
+            let message = "\(prefix) FAILURE: \(error)"
+            NSLog("%@", message)
+            fatalError(message)
+        }
+    }
+#endif
 }
 
 public enum PersistenceError: Error {

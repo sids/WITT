@@ -7,11 +7,13 @@ This is the execution record for `CLOUD-001`, `CLOUD-002`, and `CLOUD-003` in [t
 - App: WITT `1.0 (7)` from commit `d723e9e3bc3cd6bd1557d7ee4c2a7dfc813de07c`
 - CloudKit container: `iCloud.in.sids.witt`
 - Participants: Account A and Account B on separate physical devices
-- Result: Not started
+- Result: `CLOUD-001` passed; `CLOUD-002` and `CLOUD-003` not started
 
 Do not record Apple IDs, invitation URLs, CloudKit tokens, or other credentials here.
 
 ## Production Schema Gate
+
+Passed July 15, 2026. The steps below remain the repeatable gate for future model changes.
 
 Before interpreting any TestFlight sharing result:
 
@@ -64,8 +66,8 @@ Any missing or corrupt graph/photo, wrong-store record, private-data leak, faile
 
 ## Results
 
-- Production schema verified at:
-- Schema deployment performed:
+- Production schema verified at: July 15, 2026, 06:13 UTC / 11:43 IST
+- Schema deployment performed: Yes. Core Data initialized development from the build-7 model; CloudKit Console reviewed 8 record types, 8 generated index sets, and 3 standard security-role updates before deployment. A post-deploy `cktool` export matched the 236-line development schema byte-for-byte.
 - Account A device / OS:
 - Account B device / OS:
 - Invitation accepted at:
@@ -77,6 +79,6 @@ Any missing or corrupt graph/photo, wrong-store record, private-data leak, faile
 - Offline reconnect latency:
 - Fresh-install hydration latency:
 - Revocation result:
-- CloudKit errors:
-- Final result:
+- CloudKit errors: No production deployment or export errors. Initial development dry runs correctly exposed an unsigned-in simulator and then a one-time mirroring-setup timeout; after normal store setup, dry run and initialization both succeeded.
+- Final result: `CLOUD-001` pass; sharing and photo-transfer results pending.
 - Follow-up defects:

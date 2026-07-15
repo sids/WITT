@@ -48,6 +48,52 @@ final class ThingPhotoLabelingTests: XCTestCase {
 }
 
 final class PersistenceControllerTests: XCTestCase {
+#if DEBUG
+    func testCloudKitSchemaInitializationArgumentsAreOptIn() {
+        XCTAssertNil(
+            PersistenceController.CloudKitSchemaInitializationRequest.requested(
+                in: ["witt", "--some-other-argument"]
+            )
+        )
+    }
+
+    func testCloudKitSchemaDryRunArgumentUsesDryRunAndPrintSchemaOptions() throws {
+        let request = try XCTUnwrap(
+            PersistenceController.CloudKitSchemaInitializationRequest.requested(
+                in: ["witt", "--initialize-cloudkit-schema-dry-run"]
+            )
+        )
+
+        XCTAssertEqual(request, .dryRun)
+        XCTAssertEqual(request.options, [.dryRun, .printSchema])
+    }
+
+    func testCloudKitSchemaInitializationArgumentUsesPrintSchemaOption() throws {
+        let request = try XCTUnwrap(
+            PersistenceController.CloudKitSchemaInitializationRequest.requested(
+                in: ["witt", "--initialize-cloudkit-schema"]
+            )
+        )
+
+        XCTAssertEqual(request, .initialize)
+        XCTAssertEqual(request.options, [.printSchema])
+    }
+
+    func testCloudKitSchemaInitializationArgumentTakesPrecedenceOverDryRun() throws {
+        let request = try XCTUnwrap(
+            PersistenceController.CloudKitSchemaInitializationRequest.requested(
+                in: [
+                    "witt",
+                    "--initialize-cloudkit-schema-dry-run",
+                    "--initialize-cloudkit-schema"
+                ]
+            )
+        )
+
+        XCTAssertEqual(request, .initialize)
+    }
+#endif
+
     func testInMemoryControllerLoadsAllEntities() {
         let persistence = PersistenceController.inMemory()
 

@@ -41,7 +41,7 @@ Workflow:
 
 ## P0 - Release Gates
 
-- [ ] CLOUD-001 - Deploy or verify the production schema for `iCloud.in.sids.witt` before relying on synced or shared TestFlight data.
+- [x] CLOUD-001 - Production schema for `iCloud.in.sids.witt` was initialized from the build-7 Core Data model, reviewed, deployed, and independently re-exported on July 15, 2026. Production matches development exactly: eight WITT `CD_*` record types, generated indexes and security roles, and both `PhotoAsset` payloads mapped to companion `ASSET` fields.
 - [ ] CLOUD-002 - Run the real-device, two-iCloud-account Place-sharing spike.
   - Execution runbook and evidence record: [sharing-spike.md](sharing-spike.md).
   - [ ] Use two physical devices signed into different iCloud accounts.

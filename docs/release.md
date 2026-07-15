@@ -10,6 +10,7 @@ This page records durable distribution facts and the repeatable release process.
 | Apple app ID | `6789885351` |
 | Bundle ID | `in.sids.witt` |
 | CloudKit container | `iCloud.in.sids.witt` |
+| CloudKit production schema | Deployed July 15, 2026; post-deploy export exactly matches the 8-record-type development schema, including both `PhotoAsset` asset mappings |
 | Internal TestFlight group | `WITT Internal` |
 | Current TestFlight build | 1.0 (7) |
 | Source commit | `d723e9e` |
@@ -38,6 +39,12 @@ This page records durable distribution facts and the repeatable release process.
 - Confirm the distribution provisioning profile contains the production `aps-environment` entitlement after archive export. The source entitlement can show `development`; signing resolves the effective value for the selected profile.
 - Keep `ITSAppUsesNonExemptEncryption` set to `false` unless the app's encryption use changes.
 - Never embed provider credentials or release-service credentials in the app, project files, archive, or documentation.
+
+## CloudKit Schema
+
+The build-7 Core Data schema was initialized in development, reviewed in CloudKit Console, deployed to production, and independently re-exported on July 15, 2026. The production export exactly matches development and contains all eight WITT `CD_*` record types, generated indexes and standard security roles, plus `CD_data_ckAsset` and `CD_thumbnailData_ckAsset` on `CD_PhotoAsset`.
+
+Future Core Data changes must be additive. In a Debug build on an iCloud-signed-in simulator or device, use `--initialize-cloudkit-schema-dry-run` first and `--initialize-cloudkit-schema` only after validation. These paths are opt-in, disabled under XCTest, and absent from Release builds. Export development and production with `cktool`, review the pending CloudKit Console deployment, and confirm the post-deploy exports match before relying on TestFlight sync.
 
 ## Release Checklist
 

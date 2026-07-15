@@ -16,6 +16,7 @@ WITT is at the seventh integrated implementation milestone. The native SwiftUI a
 - AVFoundation QR scanning handles permissions, lifecycle, torch state, orientation, duplicate suppression, known destinations, and unknown payloads. Arbitrary non-empty QR payloads preserve exact identity, while valid generated WITT URLs unwrap to legacy raw tokens and external WITT deep links remain strictly validated.
 - Camera and Photos picker input is normalized, stripped of metadata, resized, thumbnailed, and stored as explicit `PhotoAsset` records.
 - Place-rooted CloudKit sharing includes private/shared stores, read/write participant sharing UI, and invitation acceptance.
+- The production schema for `iCloud.in.sids.witt` was deployed and independently re-exported on July 15, 2026. It contains all eight Core Data-generated WITT record types and exact `ASSET` mappings for full and thumbnail `PhotoAsset` payloads. Debug-only, opt-in launch arguments validate or initialize future development schemas after both stores load; release builds contain no schema-initialization path.
 - Unknown QR codes can be attached in one flow while selecting or creating a Room, Storage Area, and optional Container.
 - Printable random QR labels use one physical-paper model for A4, US Letter, and Custom fixed or unlimited-length paper. Four paper margins, exact label dimensions, and horizontal/vertical gaps derive the grid. The default matches a 100 mm four-up roll of contiguous 25 × 25 mm square labels. Square labels are QR-only; rectangular labels put the ID beside the QR with an optional write-in line. Output retains validated geometry, Quick Look preview, share, and print.
 - Place, Room, Storage Area, Container, and Thing support create, edit, same-Place move, photo replacement/removal, and cascading archive through explicit repository contracts and native management forms.
@@ -30,7 +31,7 @@ The next product-critical validation is real-device sharing between two iCloud a
 
 ## Verification And Distribution
 
-The baseline is 145 passing `wittTests` simulator tests in both Debug and Release-optimized configurations. Coverage includes persistence, managed-object runtime mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, arbitrary and generated QR identity compatibility, atomic QR creation/replacement, QR routing, scanning and printing, fixed/continuous physical label geometry and content rules, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
+The baseline is 149 passing `wittTests` simulator tests in Debug and 145 in Release-optimized configuration. The four Debug-only tests cover the opt-in CloudKit schema launch-argument contract; the initializer and those tests are absent from Release. Remaining coverage includes persistence, managed-object runtime mappings and build-4 schema compatibility, containment and management mutations, selected-Place Browse restoration, explicit Room-path replacement and descendant counts, deferred scanner routing, arbitrary and generated QR identity compatibility, atomic QR creation/replacement, QR routing, scanning and printing, fixed/continuous physical label geometry and content rules, photo normalization, AI transport, management-form helpers, presentation behavior, and Place sharing helpers.
 
 Version 1.0 build 7 is `IN_BETA_TESTING` through the `WITT Internal` TestFlight group with auto-notify enabled. It adds arbitrary non-empty QR payload support and the latest Browse creation-control polish, including the final full-width New Storage Area treatment. Its source commit is `d723e9e`, and its App Store Connect build ID is `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3`. On July 15, 2026, Sid confirmed that the affected iPhone successfully creates, saves, reopens, and retains a Container across relaunch, completing FB-024. See [release.md](release.md) for durable release facts and process.
 
@@ -42,3 +43,4 @@ Version 1.0 build 7 is `IN_BETA_TESTING` through the `WITT Internal` TestFlight 
 - [AI labeling](ai-labeling.md)
 - [Todo tracker](todo.md)
 - [Release](release.md)
+- [Place sharing spike](sharing-spike.md)
