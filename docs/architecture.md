@@ -123,7 +123,7 @@ AI remains behind `ThingPhotoLabelingService`. The Responses-compatible adapter 
 
 ## Testing seams and baseline
 
-The `wittTests` target currently passes 171 tests in Debug and 167 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
+The `wittTests` target currently passes 168 tests in Debug and 164 in Release-optimized configuration. Four Debug-only tests cover the opt-in CloudKit schema launch-argument contract. The baseline covers:
 
 - pure containment, same-Place ownership, and Container-cycle validation;
 - Core Data creation, edits, moves, archive cascades, snapshots, store placement, QR mutations, repair consolidation, and healthy-takeover refusal;
@@ -145,6 +145,6 @@ The implemented app shell, repository, photo pipeline, scanner, QR printing, sha
 3. Put AI behind a WITT-owned relay or another short-lived credential mechanism. Never ship a long-lived provider API key in the app bundle. Select the production model, endpoint policy, retention/privacy disclosures, failure budget, and user-facing consent posture before enabling live labeling.
 4. Keep future CloudKit model changes additive and repeat schema initialization/deployment verification. Continue validating push delivery and migration behavior; build 7 signing and the current production schema are verified.
 5. Run device coverage for camera permission transitions, QR focus/rotation/torch behavior, deep-link launch from a cold app, photo capture memory pressure, iPad presentation, physical A4/Letter printing, and representative thermal printers.
-6. Preserve the 171-test Debug and 167-test Release-optimized baselines and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
+6. Preserve the 168-test Debug and 164-test Release-optimized baselines and add focused regression coverage for any release-gate fixes. Run the suite with Release optimization and `ENABLE_TESTABILITY=YES` before TestFlight uploads, in addition to the ordinary Debug baseline. Treat [todo.md](todo.md) as the authority for current TestFlight gates and completion state rather than copying a live backlog into this document.
 
 These gates are validation and production-operations work, not a request to reopen settled domain boundaries. Place-rooted ownership, explicit Area/Container QR binding, provider-neutral AI, normalized photo inputs, and snapshot-based presentation remain the architectural constraints.

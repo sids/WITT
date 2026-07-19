@@ -123,12 +123,6 @@ struct BrowseRestoredState: Equatable {
     let visiblePath: [BrowseRoute]
 }
 
-enum BrowsePathTransition {
-    static func selectingRoom(_ roomID: UUID, replacing _: [BrowseRoute]) -> [BrowseRoute] {
-        [.room(roomID)]
-    }
-}
-
 enum BrowseSelectionRestorer {
     static func state(
         for destination: BrowseRoute?,
@@ -156,11 +150,6 @@ enum BrowseSelectionRestorer {
     }
 }
 
-private struct ManagementPresentation: Identifiable {
-    let id = UUID()
-    let route: ManagementRoute
-}
-
 struct BrowseView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var store: CatalogStore
@@ -173,7 +162,7 @@ struct BrowseView: View {
     @State private var path: [BrowseRoute] = []
     @State private var selectedPlaceID: UUID?
     @State private var hasCompletedRestoration = false
-    @State private var managementPresentation: ManagementPresentation?
+    @State private var managementRoute: ManagementRoute?
     @State private var query = ""
     @State private var isSearchPresented = false
     @State private var hasPresentedEmptyPlaceCreation = false
@@ -204,17 +193,16 @@ struct BrowseView: View {
                     BrowseDestinationView(
                         store: store,
                         route: route,
-                        onSharePlace: onSharePlace,
                         presentManagement: presentManagement
                     )
                 )
             }
         }
-        .sheet(item: $managementPresentation, onDismiss: finishManagementDismissal) { presentation in
+        .sheet(item: $managementRoute, onDismiss: finishManagementDismissal) { route in
             ManagementSheet(
                 store: store,
-                route: presentation.route,
-                onCreatedPlace: selectCreatedPlace,
+                route: route,
+                onCreatedPlace: selectPlace,
                 onThingPostSaveHandoff: dismissManagement(after:)
             )
         }
@@ -339,7 +327,7 @@ struct BrowseView: View {
     }
 
     private func presentManagement(_ route: ManagementRoute) {
-        managementPresentation = ManagementPresentation(route: route)
+        managementRoute = route
     }
 
     private func restoreIfReady() {
@@ -397,13 +385,9 @@ struct BrowseView: View {
         persistCurrentDestination()
     }
 
-    private func selectCreatedPlace(_ placeID: UUID) {
-        selectPlace(placeID)
-    }
-
     private func selectRoom(_ roomID: UUID) {
         withAnimation {
-            path = BrowsePathTransition.selectingRoom(roomID, replacing: path)
+            path = [.room(roomID)]
         }
     }
 
@@ -421,7 +405,7 @@ struct BrowseView: View {
 
     private func dismissManagement(after handoff: ThingPostSaveHandoff) {
         thingPostSaveDismissal.begin(handoff)
-        managementPresentation = nil
+        managementRoute = nil
     }
 
     private func finishManagementDismissal() {
@@ -556,7 +540,6 @@ private struct PlaceListView: View {
 private struct BrowseDestinationView: View {
     @ObservedObject var store: CatalogStore
     let route: BrowseRoute
-    let onSharePlace: (UUID) -> Void
     let presentManagement: (ManagementRoute) -> Void
 
     var body: some View {

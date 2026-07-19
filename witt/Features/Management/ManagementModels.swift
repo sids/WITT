@@ -67,6 +67,19 @@ extension ThingDestination {
     }
 }
 
+extension ContainerDestination {
+    init(parent: ContainerSnapshotParent) {
+        switch parent {
+        case .room(let id):
+            self = .room(id)
+        case .area(let id):
+            self = .area(id)
+        case .container(let id):
+            self = .container(id)
+        }
+    }
+}
+
 enum ManagementPhotoSelection: Hashable, Sendable {
     case unchanged
     case replacement(NormalizedPhoto)
@@ -133,15 +146,6 @@ enum ManagementPreselection {
     ) -> ThingDestination? {
         if let context, options.contains(where: { $0.destination == context }) { return context }
         return options.first?.destination
-    }
-}
-
-enum ManagementAIDecision: Hashable, Sendable {
-    case analyze
-    case skip
-
-    static func afterSelectingPhoto(isCreating: Bool) -> Self {
-        isCreating ? .analyze : .skip
     }
 }
 

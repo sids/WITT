@@ -47,7 +47,7 @@ struct ThingSavedView: View {
 private struct ManagementPhotoSection: View {
     let existingThumbnailData: Data?
     @Binding var selection: ManagementPhotoSelection
-    let onReplacement: (NormalizedPhoto) -> Void
+    var onReplacement: (NormalizedPhoto) -> Void = { _ in }
     var onRemove: () -> Void = {}
 
     @State private var showsCamera = false
@@ -122,6 +122,37 @@ private struct ManagementPhotoSection: View {
     }
 }
 
+private struct ArchiveActionSection: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Section {
+            Button(title, role: .destructive, action: action)
+                .accessibilityIdentifier("management.archive")
+        }
+    }
+}
+
+private struct DraftQRCodeSection: View {
+    let hasSelection: Bool
+    let onScan: () -> Void
+
+    var body: some View {
+        Section("QR Code") {
+            if hasSelection {
+                Label("QR Code Ready", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            Button(
+                hasSelection ? "Scan Different QR Code" : "Scan QR Code",
+                systemImage: "qrcode.viewfinder",
+                action: onScan
+            )
+        }
+    }
+}
+
 struct PlaceManagementForm: View {
     @ObservedObject var store: CatalogStore
     let placeID: UUID?
@@ -152,10 +183,13 @@ struct PlaceManagementForm: View {
                     ManagementPhotoSection(
                         existingThumbnailData: place?.primaryPhoto?.thumbnailData
                             ?? place?.primaryPhoto?.data,
-                        selection: $photo,
-                        onReplacement: { _ in }
+                        selection: $photo
                     )
-                    if placeID != nil { archiveSection }
+                    if placeID != nil {
+                        ArchiveActionSection(title: "Archive Place") {
+                            confirmsArchive = true
+                        }
+                    }
                 }
                 .disabled(isSaving)
             } else {
@@ -181,13 +215,6 @@ struct PlaceManagementForm: View {
             Button("Archive Place", role: .destructive) { beginArchive() }
         } message: {
             Text(placeArchiveFacts.message)
-        }
-    }
-
-    private var archiveSection: some View {
-        Section {
-            Button("Archive Place", role: .destructive) { confirmsArchive = true }
-                .accessibilityIdentifier("management.archive")
         }
     }
 
@@ -291,9 +318,8 @@ struct RoomManagementForm: View {
                         }
                     }
                     if roomID != nil {
-                        Section {
-                            Button("Archive Room", role: .destructive) { confirmsArchive = true }
-                                .accessibilityIdentifier("management.archive")
+                        ArchiveActionSection(title: "Archive Room") {
+                            confirmsArchive = true
                         }
                     }
                 }
@@ -331,7 +357,8 @@ struct RoomManagementForm: View {
 
     private var normalizedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var archiveFacts: ManagementArchiveFacts {
-        ManagementArchiveFacts(place.map { $0.archiveImpact(forRoomID: roomID ?? UUID()) } ?? .empty)
+        guard let place, let roomID else { return ManagementArchiveFacts(.empty) }
+        return ManagementArchiveFacts(place.archiveImpact(forRoomID: roomID))
     }
 
     private func initialize() {
@@ -422,14 +449,17 @@ struct AreaManagementForm: View {
                     }
                     ManagementPhotoSection(
                         existingThumbnailData: area?.primaryPhoto?.thumbnailData ?? area?.primaryPhoto?.data,
-                        selection: $photo,
-                        onReplacement: { _ in }
+                        selection: $photo
                     )
-                    if areaID == nil { qrCodeSection }
+                    if areaID == nil {
+                        DraftQRCodeSection(hasSelection: selectedQRToken != nil) {
+                            isNameFocused = false
+                            showsQRScanner = true
+                        }
+                    }
                     if areaID != nil {
-                        Section {
-                            Button("Archive Storage Area", role: .destructive) { confirmsArchive = true }
-                                .accessibilityIdentifier("management.archive")
+                        ArchiveActionSection(title: "Archive Storage Area") {
+                            confirmsArchive = true
                         }
                     }
                 }
@@ -464,10 +494,7 @@ struct AreaManagementForm: View {
         ) {
             Button("Archive Storage Area", role: .destructive) { beginArchive() }
         } message: {
-            Text(
-                ManagementArchiveFacts(
-                    place.map { $0.archiveImpact(forAreaID: areaID ?? UUID()) } ?? .empty
-                ).message)
+            Text(archiveFacts.message)
         }
     }
 
@@ -475,25 +502,9 @@ struct AreaManagementForm: View {
         areaID == nil ? "\(store.place(id: room.placeID)?.name ?? "Place") · \(room.name)" : room.name
     }
 
-    private var qrCodeSection: some View {
-        Section("QR Code") {
-            if selectedQRToken == nil {
-                Button("Scan QR Code", systemImage: "qrcode.viewfinder") {
-                    presentQRScanner()
-                }
-            } else {
-                Label("QR Code Ready", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
-                Button("Scan Different QR Code", systemImage: "qrcode.viewfinder") {
-                    presentQRScanner()
-                }
-            }
-        }
-    }
-
-    private func presentQRScanner() {
-        isNameFocused = false
-        showsQRScanner = true
+    private var archiveFacts: ManagementArchiveFacts {
+        guard let place, let areaID else { return ManagementArchiveFacts(.empty) }
+        return ManagementArchiveFacts(place.archiveImpact(forAreaID: areaID))
     }
 
     private func initialize() {
@@ -592,14 +603,17 @@ struct ContainerManagementForm: View {
                     ManagementPhotoSection(
                         existingThumbnailData: container?.primaryPhoto?.thumbnailData
                             ?? container?.primaryPhoto?.data,
-                        selection: $photo,
-                        onReplacement: { _ in }
+                        selection: $photo
                     )
-                    if containerID == nil { qrCodeSection }
+                    if containerID == nil {
+                        DraftQRCodeSection(hasSelection: selectedQRToken != nil) {
+                            isNameFocused = false
+                            showsQRScanner = true
+                        }
+                    }
                     if containerID != nil {
-                        Section {
-                            Button("Archive Container", role: .destructive) { confirmsArchive = true }
-                                .accessibilityIdentifier("management.archive")
+                        ArchiveActionSection(title: "Archive Container") {
+                            confirmsArchive = true
                         }
                     }
                 }
@@ -634,10 +648,7 @@ struct ContainerManagementForm: View {
         ) {
             Button("Archive Container", role: .destructive) { beginArchive() }
         } message: {
-            Text(
-                ManagementArchiveFacts(
-                    place.map { $0.archiveImpact(forContainerID: containerID ?? UUID()) } ?? .empty
-                ).message)
+            Text(archiveFacts.message)
         }
     }
 
@@ -647,42 +658,18 @@ struct ContainerManagementForm: View {
         values.name = container?.name ?? ""
         values.detail = container?.detail ?? ""
         destination =
-            container.map { destination(from: $0.parent) }
+            container.map { ContainerDestination(parent: $0.parent) }
             ?? ManagementPreselection.containerDestination(context: contextDestination, options: options)
     }
 
-    private var qrCodeSection: some View {
-        Section("QR Code") {
-            if selectedQRToken == nil {
-                Button("Scan QR Code", systemImage: "qrcode.viewfinder") {
-                    presentQRScanner()
-                }
-            } else {
-                Label("QR Code Ready", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
-                Button("Scan Different QR Code", systemImage: "qrcode.viewfinder") {
-                    presentQRScanner()
-                }
-            }
-        }
-    }
-
-    private func presentQRScanner() {
-        isNameFocused = false
-        showsQRScanner = true
+    private var archiveFacts: ManagementArchiveFacts {
+        guard let place, let containerID else { return ManagementArchiveFacts(.empty) }
+        return ManagementArchiveFacts(place.archiveImpact(forContainerID: containerID))
     }
 
     private func reconcileDestination() {
         destination = ManagementPreselection.containerDestination(
             context: destination, options: options)
-    }
-
-    private func destination(from parent: ContainerSnapshotParent) -> ContainerDestination {
-        switch parent {
-        case .room(let id): .room(id)
-        case .area(let id): .area(id)
-        case .container(let id): .container(id)
-        }
     }
 
     private func save() async {
@@ -790,9 +777,8 @@ struct ThingManagementForm: View {
                         onRemove: discardCurrentAISuggestions
                     )
                     if thingID != nil {
-                        Section {
-                            Button("Archive Thing", role: .destructive) { confirmsArchive = true }
-                                .accessibilityIdentifier("management.archive")
+                        ArchiveActionSection(title: "Archive Thing") {
+                            confirmsArchive = true
                         }
                     }
                 }
@@ -832,20 +818,12 @@ struct ThingManagementForm: View {
         values.notes = thing?.notes ?? ""
         values.keywords = thing?.keywords.joined(separator: ", ") ?? ""
         destination =
-            thing.map { destination(from: $0.home) }
+            thing.map { ThingDestination(home: $0.home) }
             ?? ManagementPreselection.thingDestination(context: contextDestination, options: options)
     }
 
     private func reconcileDestination() {
         destination = ManagementPreselection.thingDestination(context: destination, options: options)
-    }
-
-    private func destination(from home: ThingSnapshotHome) -> ThingDestination {
-        switch home {
-        case .room(let id): .room(id)
-        case .area(let id): .area(id)
-        case .container(let id): .container(id)
-        }
     }
 
     private var nameBinding: Binding<String> {
@@ -881,9 +859,7 @@ struct ThingManagementForm: View {
     }
 
     private func beginAnalysisIfNeeded(_ selected: NormalizedPhoto) {
-        guard ManagementAIDecision.afterSelectingPhoto(isCreating: thingID == nil) == .analyze else {
-            return
-        }
+        guard thingID == nil else { return }
         discardCurrentAISuggestions()
         let requestID = UUID()
         analysisRequestID = requestID

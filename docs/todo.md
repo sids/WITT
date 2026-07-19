@@ -68,7 +68,7 @@ The prepared recommendations and failure criteria are in [product-decisions.md](
   - [x] Simulator profiling rejected two higher-memory alternatives; photo-library work is lifecycle-bound, prevents overlapping selection, cooperates with cancellation, and suppresses stale callbacks.
   - [ ] Repeat full-resolution camera and iCloud-library ingestion on devices, including dismiss/reopen, memory warnings, sustained sessions, and thermal pressure.
 - [ ] TEST-001 - Add focused regression tests with each change and keep both full simulator configurations green.
-  - [x] July 19 simplification checkpoint: 171 Debug and 167 Release-optimized tests passed with zero failures or skips; Debug and Release builds succeeded, and Release inspection found no screenshot-demo, mock-labeling, relay, or evaluator symbols.
+  - [x] July 19 simplification checkpoint: 168 Debug and 164 Release-optimized tests passed with zero failures or skips; Debug and Release builds succeeded, and Release inspection found no screenshot-demo, mock-labeling, relay, or evaluator symbols.
 
 ## P2 - App Store Release
 

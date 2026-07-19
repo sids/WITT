@@ -264,44 +264,6 @@ final class CatalogPresentationTests: XCTestCase {
         )
     }
 
-    func testSelectingRoomReplacesRestoredDeepPath() {
-        let oldRoomID = UUID()
-        let selectedRoomID = UUID()
-        let existingPath: [BrowseRoute] = [
-            .room(oldRoomID),
-            .area(UUID()),
-            .container(UUID())
-        ]
-
-        XCTAssertEqual(
-            BrowsePathTransition.selectingRoom(selectedRoomID, replacing: existingPath),
-            [.room(selectedRoomID)]
-        )
-    }
-
-    func testSelectingRoomReplacesSiblingRoomPath() {
-        let selectedRoomID = UUID()
-
-        XCTAssertEqual(
-            BrowsePathTransition.selectingRoom(
-                selectedRoomID,
-                replacing: [.room(UUID())]
-            ),
-            [.room(selectedRoomID)]
-        )
-    }
-
-    func testBackAfterExplicitRoomSelectionReturnsToPlaceRoot() {
-        var path = BrowsePathTransition.selectingRoom(UUID(), replacing: [
-            .room(UUID()),
-            .thing(UUID())
-        ])
-
-        path.removeLast()
-
-        XCTAssertTrue(path.isEmpty)
-    }
-
     func testDestinationPathDoesNotMatchTheWrongPlace() {
         let first = makePlace(name: "Home")
         let secondID = UUID()

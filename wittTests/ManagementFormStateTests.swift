@@ -56,6 +56,19 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertEqual(ThingDestination(home: .container(containerID)), .container(containerID))
     }
 
+    func testContainerDestinationUsesSavedContainersExactParent() {
+        let roomID = UUID()
+        let areaID = UUID()
+        let containerID = UUID()
+
+        XCTAssertEqual(ContainerDestination(parent: .room(roomID)), .room(roomID))
+        XCTAssertEqual(ContainerDestination(parent: .area(areaID)), .area(areaID))
+        XCTAssertEqual(
+            ContainerDestination(parent: .container(containerID)),
+            .container(containerID)
+        )
+    }
+
     func testValuesNormalizeDraftTextAndKeywords() {
         let values = ManagementFormValues(
             name: "  Flashlight  ",
@@ -114,11 +127,6 @@ final class ManagementFormStateTests: XCTestCase {
         XCTAssertFalse(facts.message.contains("0 Things"))
         XCTAssertTrue(facts.message.contains("QR codes"))
         XCTAssertTrue(facts.message.contains("will also be archived"))
-    }
-
-    func testAIAnalysisRunsForCreateButNotEditPhotoSelection() {
-        XCTAssertEqual(ManagementAIDecision.afterSelectingPhoto(isCreating: true), .analyze)
-        XCTAssertEqual(ManagementAIDecision.afterSelectingPhoto(isCreating: false), .skip)
     }
 
     func testQRAssignmentDecisionAcceptsUnknownAndExpectedTargetsWithoutStealing() {
