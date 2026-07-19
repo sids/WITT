@@ -83,7 +83,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let token = try QRToken.generate()
         let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
 
-        _ = try await repository.bindQRCode(.init(token: token, target: target))
+        try await repository.bindQRCode(.init(token: token, target: target))
 
         let legacyValue = Date(timeIntervalSince1970: 1_700_000_000)
         let context = persistence.viewContext
@@ -114,7 +114,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
         let payload = try XCTUnwrap(QRToken(rawValue: "  vendor:item/42?serial=A+B  "))
 
-        _ = try await repository.bindQRCode(.init(token: payload, target: target))
+        try await repository.bindQRCode(.init(token: payload, target: target))
 
         let exactResolution = try await repository.resolve(payload)
         let trimmedPayload = try XCTUnwrap(QRToken(rawValue: "vendor:item/42?serial=A+B"))
@@ -210,7 +210,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let existingTarget = try XCTUnwrap(place.areas.first { $0.id != area.id })
         let token = try QRToken.generate()
         let existingBindingTarget = QRBindingTarget.area(QRTargetID(rawValue: existingTarget.id))
-        _ = try await repository.bindQRCode(.init(token: token, target: existingBindingTarget))
+        try await repository.bindQRCode(.init(token: token, target: existingBindingTarget))
         let before = try await repository.fetchPlaces()
 
         await assertRepositoryError(.tokenAlreadyBound) {
@@ -238,11 +238,11 @@ final class CatalogRepositoryTests: XCTestCase {
         let newContainerToken = try QRToken.generate()
         let areaTarget = QRBindingTarget.area(QRTargetID(rawValue: area.id))
         let containerTarget = QRBindingTarget.container(QRTargetID(rawValue: container.id))
-        _ = try await repository.bindQRCode(.init(token: oldAreaToken, target: areaTarget))
-        _ = try await repository.bindQRCode(.init(token: oldContainerToken, target: containerTarget))
+        try await repository.bindQRCode(.init(token: oldAreaToken, target: areaTarget))
+        try await repository.bindQRCode(.init(token: oldContainerToken, target: containerTarget))
 
-        _ = try await repository.replaceQRCode(.init(token: newAreaToken, target: areaTarget))
-        _ = try await repository.replaceQRCode(.init(token: newContainerToken, target: containerTarget))
+        try await repository.replaceQRCode(.init(token: newAreaToken, target: areaTarget))
+        try await repository.replaceQRCode(.init(token: newContainerToken, target: containerTarget))
 
         let oldAreaResolution = try await repository.resolve(oldAreaToken)
         let newAreaResolution = try await repository.resolve(newAreaToken)
@@ -263,11 +263,11 @@ final class CatalogRepositoryTests: XCTestCase {
         let secondToken = try QRToken.generate()
         let firstTarget = QRBindingTarget.area(QRTargetID(rawValue: first.id))
         let secondTarget = QRBindingTarget.area(QRTargetID(rawValue: second.id))
-        _ = try await repository.bindQRCode(.init(token: firstToken, target: firstTarget))
-        _ = try await repository.bindQRCode(.init(token: secondToken, target: secondTarget))
+        try await repository.bindQRCode(.init(token: firstToken, target: firstTarget))
+        try await repository.bindQRCode(.init(token: secondToken, target: secondTarget))
 
         await assertRepositoryError(.tokenAlreadyBound) {
-            _ = try await repository.replaceQRCode(.init(token: secondToken, target: firstTarget))
+            try await repository.replaceQRCode(.init(token: secondToken, target: firstTarget))
         }
 
         let firstResolution = try await repository.resolve(firstToken)
@@ -286,12 +286,12 @@ final class CatalogRepositoryTests: XCTestCase {
         let occupied = try XCTUnwrap(QRToken(rawValue: "occupied payload"))
         let firstTarget = QRBindingTarget.area(QRTargetID(rawValue: first.id))
         let secondTarget = QRBindingTarget.area(QRTargetID(rawValue: second.id))
-        _ = try await repository.bindQRCode(.init(token: oldPayload, target: firstTarget))
-        _ = try await repository.bindQRCode(.init(token: occupied, target: secondTarget))
+        try await repository.bindQRCode(.init(token: oldPayload, target: firstTarget))
+        try await repository.bindQRCode(.init(token: occupied, target: secondTarget))
 
-        _ = try await repository.replaceQRCode(.init(token: replacement, target: firstTarget))
+        try await repository.replaceQRCode(.init(token: replacement, target: firstTarget))
         await assertRepositoryError(.tokenAlreadyBound) {
-            _ = try await repository.replaceQRCode(.init(token: occupied, target: firstTarget))
+            try await repository.replaceQRCode(.init(token: occupied, target: firstTarget))
         }
 
         let oldResolution = try await repository.resolve(oldPayload)
@@ -308,7 +308,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let retainedToken = try QRToken.generate()
         let obsoleteToken = try QRToken.generate()
         let areaTarget = QRBindingTarget.area(QRTargetID(rawValue: area.id))
-        _ = try await repository.bindQRCode(.init(token: retainedToken, target: areaTarget))
+        try await repository.bindQRCode(.init(token: retainedToken, target: areaTarget))
 
         let context = persistence.viewContext
         try await context.perform {
@@ -432,7 +432,7 @@ final class CatalogRepositoryTests: XCTestCase {
         }
         XCTAssertEqual(repair.reason, .duplicateBindings)
 
-        _ = try await repository.repairQRCode(.init(
+        try await repository.repairQRCode(.init(
             token: token,
             target: .area(QRTargetID(rawValue: target.id))
         ))
@@ -449,13 +449,13 @@ final class CatalogRepositoryTests: XCTestCase {
         let archivedArea = try XCTUnwrap(place.areas.first)
         let destination = try XCTUnwrap(place.areas.first { $0.id != archivedArea.id })
         let token = try QRToken.generate()
-        _ = try await repository.bindQRCode(.init(
+        try await repository.bindQRCode(.init(
             token: token,
             target: .area(QRTargetID(rawValue: archivedArea.id))
         ))
         _ = try await repository.archiveArea(id: archivedArea.id)
 
-        _ = try await repository.repairQRCode(.init(
+        try await repository.repairQRCode(.init(
             token: token,
             target: .area(QRTargetID(rawValue: destination.id))
         ))
@@ -503,7 +503,7 @@ final class CatalogRepositoryTests: XCTestCase {
         XCTAssertTrue(areaIsEligible)
         XCTAssertTrue(containerIsEligible)
 
-        _ = try await repository.repairQRCode(.init(
+        try await repository.repairQRCode(.init(
             token: token,
             target: .container(QRTargetID(rawValue: container.id))
         ))
@@ -592,11 +592,11 @@ final class CatalogRepositoryTests: XCTestCase {
         let unknown = try XCTUnwrap(QRToken(rawValue: "unknown repair refusal"))
         let healthy = try XCTUnwrap(QRToken(rawValue: "healthy repair refusal"))
         let target = QRBindingTarget.area(QRTargetID(rawValue: area.id))
-        _ = try await repository.bindQRCode(.init(token: healthy, target: target))
+        try await repository.bindQRCode(.init(token: healthy, target: target))
 
         for token in [unknown, healthy] {
             await assertRepositoryError(.qrCodeNotRepairable) {
-                _ = try await repository.repairQRCode(.init(token: token, target: target))
+                try await repository.repairQRCode(.init(token: token, target: target))
             }
             await assertRepositoryError(.qrCodeNotRepairable) {
                 try await repository.releaseRepairableQRCode(token)
@@ -625,7 +625,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let conflictContainer = try XCTUnwrap(place.containers.first)
         let conflictToken = try XCTUnwrap(QRToken(rawValue: "conflict cannot take occupied"))
         let healthyToken = try XCTUnwrap(QRToken(rawValue: "healthy occupied target"))
-        _ = try await repository.bindQRCode(.init(
+        try await repository.bindQRCode(.init(
             token: healthyToken,
             target: .area(QRTargetID(rawValue: occupiedArea.id))
         ))
@@ -654,7 +654,7 @@ final class CatalogRepositoryTests: XCTestCase {
         XCTAssertFalse(occupiedIsEligible)
 
         await assertRepositoryError(.targetAlreadyHasQRCode) {
-            _ = try await repository.repairQRCode(.init(
+            try await repository.repairQRCode(.init(
                 token: conflictToken,
                 target: .area(QRTargetID(rawValue: occupiedArea.id))
             ))
@@ -673,7 +673,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let damagedToken = try XCTUnwrap(QRToken(rawValue: "damaged contextual reattach"))
         let replacedToken = try XCTUnwrap(QRToken(rawValue: "healthy code being replaced"))
         let targetBinding = QRBindingTarget.area(QRTargetID(rawValue: target.id))
-        _ = try await repository.bindQRCode(.init(
+        try await repository.bindQRCode(.init(
             token: replacedToken,
             target: targetBinding
         ))
@@ -688,7 +688,7 @@ final class CatalogRepositoryTests: XCTestCase {
             try context.save()
         }
 
-        _ = try await repository.repairAndReplaceQRCode(.init(
+        try await repository.repairAndReplaceQRCode(.init(
             token: damagedToken,
             target: targetBinding
         ))
@@ -830,7 +830,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let boundArea = try XCTUnwrap(place.areas.first)
         let otherArea = try XCTUnwrap(place.areas.first { $0.id != boundArea.id })
         let token = try QRToken.generate()
-        _ = try await repository.bindQRCode(.init(
+        try await repository.bindQRCode(.init(
             token: token,
             target: .area(QRTargetID(rawValue: boundArea.id))
         ))
@@ -1075,7 +1075,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let (repository, persistence, place) = try await makeSampleRepository()
         let area = try XCTUnwrap(place.areas.first)
         let token = try QRToken.generate()
-        _ = try await repository.bindQRCode(.init(
+        try await repository.bindQRCode(.init(
             token: token, target: .area(QRTargetID(rawValue: area.id))
         ))
         _ = try await repository.updateArea(

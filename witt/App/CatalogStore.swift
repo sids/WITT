@@ -194,25 +194,15 @@ final class CatalogStore: ObservableObject {
     }
 
     func createTargetAndBind(_ request: CreateAndBindQRCodeRequest) async -> Bool {
-        do {
-            _ = try await repository.createTargetAndBindQRCode(request)
-            try await reloadCatalog()
-            return true
-        } catch {
-            errorMessage = error.localizedDescription
-            return false
-        }
+        await performMutation {
+            try await repository.createTargetAndBindQRCode(request)
+        } != nil
     }
 
     func repairCreateTargetAndBind(_ request: CreateAndBindQRCodeRequest) async -> Bool {
-        do {
-            _ = try await repository.repairCreateTargetAndBindQRCode(request)
-            try await reloadCatalog()
-            return true
-        } catch {
-            errorMessage = error.localizedDescription
-            return false
-        }
+        await performMutation {
+            try await repository.repairCreateTargetAndBindQRCode(request)
+        } != nil
     }
 
     func qrAttachTarget(for target: QRBindingTarget) -> QRAttachTargetSnapshot? {
@@ -257,8 +247,8 @@ final class CatalogStore: ObservableObject {
         to destination: ThingDestination,
         nameSource: String
     ) async -> ThingSnapshot? {
-        do {
-            let saved = try await repository.saveThing(
+        await performMutation {
+            try await repository.saveThing(
                 ReviewedThingDraft(
                     name: name,
                     keywords: keywords,
@@ -268,11 +258,6 @@ final class CatalogStore: ObservableObject {
                 ),
                 to: destination
             )
-            try await reloadCatalog()
-            return saved
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
         }
     }
 

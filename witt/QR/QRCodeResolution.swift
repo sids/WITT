@@ -1,6 +1,6 @@
 import Foundation
 
-public struct QRTargetID: RawRepresentable, Hashable, Sendable, Codable {
+public struct QRTargetID: RawRepresentable, Hashable, Sendable {
     public let rawValue: UUID
 
     public init(rawValue: UUID) {
@@ -8,12 +8,12 @@ public struct QRTargetID: RawRepresentable, Hashable, Sendable, Codable {
     }
 }
 
-public enum QRBindingTarget: Hashable, Sendable, Codable {
+public enum QRBindingTarget: Hashable, Sendable {
     case area(QRTargetID)
     case container(QRTargetID)
 }
 
-public struct QRCodeBindingRequest: Hashable, Sendable, Codable {
+public struct QRCodeBindingRequest: Hashable, Sendable {
     public let token: QRToken
     public let target: QRBindingTarget
 
@@ -23,13 +23,13 @@ public struct QRCodeBindingRequest: Hashable, Sendable, Codable {
     }
 }
 
-public enum QRCodeRepairReason: Hashable, Sendable, Codable {
+public enum QRCodeRepairReason: Hashable, Sendable {
     case missingTarget
     case invalidStoredToken
     case duplicateBindings
 }
 
-public struct QRCodeRepair: Hashable, Sendable, Codable {
+public struct QRCodeRepair: Hashable, Sendable {
     public let reason: QRCodeRepairReason
 
     public init(reason: QRCodeRepairReason) {
@@ -37,7 +37,7 @@ public struct QRCodeRepair: Hashable, Sendable, Codable {
     }
 }
 
-public struct QRCodeConflict: Hashable, Sendable, Codable {
+public struct QRCodeConflict: Hashable, Sendable {
     public let firstTarget: QRBindingTarget
     public let secondTarget: QRBindingTarget
     public let additionalTargets: [QRBindingTarget]
@@ -57,7 +57,7 @@ public struct QRCodeConflict: Hashable, Sendable, Codable {
     }
 }
 
-public enum QRCodeResolution: Hashable, Sendable, Codable {
+public enum QRCodeResolution: Hashable, Sendable {
     case knownArea(QRTargetID)
     case knownContainer(QRTargetID)
     case unknown

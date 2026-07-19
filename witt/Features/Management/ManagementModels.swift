@@ -155,51 +155,115 @@ nonisolated enum ManagementAIEditableField: Hashable, Sendable {
     case notes
 }
 
-struct ManagementAISuggestionApplication: Hashable, Sendable {
-    let values: ManagementFormValues
-    let suppliedName: Bool
-    let suppliedKeywords: Bool
-    let suppliedNotes: Bool
+struct AIAssistedThingFormState: Hashable, Sendable {
+    private enum AnalysisStatus: Hashable, Sendable {
+        case idle
+        case analyzing(UUID)
+        case succeeded
+        case failed(String)
+    }
 
-    static func apply(
-        _ suggestion: ThingLabelSuggestion,
-        to currentValues: ManagementFormValues,
-        preserving editedFields: Set<ManagementAIEditableField> = []
-    ) -> Self {
-        var values = currentValues
-        var suppliedName = false
-        var suppliedKeywords = false
-        var suppliedNotes = false
+    var values = ManagementFormValues()
+    private var status: AnalysisStatus = .idle
+    private var editedFields: Set<ManagementAIEditableField> = []
+    private var aiAppliedName: String?
+    private var aiAppliedKeywords: String?
+    private var aiAppliedNotes: String?
+
+    var isAnalyzing: Bool {
+        guard case .analyzing = status else { return false }
+        return true
+    }
+
+    var analysisSucceeded: Bool { status == .succeeded }
+
+    var analysisError: String? {
+        guard case .failed(let message) = status else { return nil }
+        return message
+    }
+
+    var nameWasAISupplied: Bool {
+        aiAppliedName.map { $0 == values.normalizedName } == true
+    }
+
+    mutating func markEdited(_ field: ManagementAIEditableField) {
+        guard case .analyzing = status else { return }
+        editedFields.insert(field)
+    }
+
+    mutating func beginAnalysis(discardingAppliedValues: Bool = false) -> UUID {
+        if discardingAppliedValues {
+            discardCurrentSuggestions()
+        }
+        let requestID = UUID()
+        status = .analyzing(requestID)
+        editedFields = []
+        return requestID
+    }
+
+    @discardableResult
+    mutating func apply(_ suggestion: ThingLabelSuggestion, requestID: UUID) -> Bool {
+        guard case .analyzing(requestID) = status else { return false }
 
         if !editedFields.contains(.name), values.normalizedName.isEmpty {
-            let proposedName = suggestion.proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !proposedName.isEmpty {
-                values.name = proposedName
-                suppliedName = true
+            let name = suggestion.proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty {
+                values.name = name
+                aiAppliedName = name
             }
         }
-
         if !editedFields.contains(.keywords), values.parsedKeywords.isEmpty {
             let keywords = ThingKeywordNormalizer.normalize(suggestion.keywords)
             if !keywords.isEmpty {
                 values.keywords = keywords.joined(separator: ", ")
-                suppliedKeywords = true
+                aiAppliedKeywords = values.keywords
             }
         }
-
         if !editedFields.contains(.notes), values.normalizedNotes == nil,
-            let detail = ManagementFormValues.optional(suggestion.detail ?? "")
+           let detail = ManagementFormValues.optional(suggestion.detail ?? "")
         {
             values.notes = detail
-            suppliedNotes = true
+            aiAppliedNotes = detail
         }
+        status = .succeeded
+        editedFields = []
+        return true
+    }
 
-        return Self(
-            values: values,
-            suppliedName: suppliedName,
-            suppliedKeywords: suppliedKeywords,
-            suppliedNotes: suppliedNotes
-        )
+    @discardableResult
+    mutating func fail(requestID: UUID, message: String) -> Bool {
+        guard case .analyzing(requestID) = status else { return false }
+        status = .failed(message)
+        editedFields = []
+        return true
+    }
+
+    mutating func cancel(requestID: UUID) {
+        guard case .analyzing(requestID) = status else { return }
+        invalidateAnalysis()
+    }
+
+    mutating func invalidateAnalysis() {
+        status = .idle
+        editedFields = []
+    }
+
+    mutating func discardCurrentSuggestions() {
+        invalidateAnalysis()
+        if let aiAppliedName, values.normalizedName == aiAppliedName {
+            values.name = ""
+        }
+        if let aiAppliedKeywords,
+           values.parsedKeywords.joined(separator: ", ") == aiAppliedKeywords
+        {
+            values.keywords = ""
+        }
+        if let aiAppliedNotes, values.normalizedNotes == aiAppliedNotes {
+            values.notes = ""
+        }
+        aiAppliedName = nil
+        aiAppliedKeywords = nil
+        aiAppliedNotes = nil
     }
 }
 

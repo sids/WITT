@@ -11,452 +11,333 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     }
 
     public func fetchPlaces() async throws -> [PlaceSnapshot] {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
+        try await read { context in
             return try Self.fetchPlaceSnapshots(in: context)
         }
     }
 
     @discardableResult
     public func seedHomeIfNeeded() async throws -> PlaceSnapshot? {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context, self] in
-            context.reset()
+        try await mutate { [self] context in
             let request = NSFetchRequest<Place>(entityName: "Place")
             request.predicate = NSPredicate(format: "archivedAt == nil")
             request.fetchLimit = 1
             guard try context.count(for: request) == 0 else { return nil }
 
-            do {
-                let place: Place = try Self.insert("Place", into: context)
-                place.name = "Home"
+            let place: Place = try Self.insert("Place", into: context)
+            place.name = "Home"
 
-                let inserted = Array(context.insertedObjects)
-                if persistenceController.usesCloudKit {
-                    for object in inserted {
-                        try persistenceController.assign(object, to: .private)
-                    }
-                }
+            let inserted = Array(context.insertedObjects)
+            if persistenceController.usesCloudKit {
                 for object in inserted {
-                    try Self.validateInsertedObject(object)
+                    try persistenceController.assign(object, to: .private)
                 }
-                try context.save()
-                return try Self.snapshot(place)
-            } catch {
-                context.rollback()
-                throw error
             }
+            for object in inserted {
+                try Self.validateInsertedObject(object)
+            }
+            return try Self.snapshot(place)
         }
     }
 
     public func createPlace(_ draft: CreatePlaceDraft) async throws -> PlaceSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context, self] in
-            context.reset()
-            do {
-                let place: Place = try Self.insert("Place", into: context)
-                place.name = try Self.requiredName(draft.name)
-                place.notes = Self.nilIfEmpty(draft.notes)
-                if let photo = draft.photo {
-                    try Self.applyPhotoMutation(.replace(photo), to: .place(place), in: context)
-                }
-                place.updatedAt = Date()
-
-                if persistenceController.usesCloudKit {
-                    for object in context.insertedObjects {
-                        try persistenceController.assign(object, to: .private)
-                    }
-                }
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(place)
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { [self] context in
+            let place: Place = try Self.insert("Place", into: context)
+            place.name = try Self.requiredName(draft.name)
+            place.notes = Self.nilIfEmpty(draft.notes)
+            if let photo = draft.photo {
+                try Self.applyPhotoMutation(.replace(photo), to: .place(place), in: context)
             }
+            place.updatedAt = Date()
+
+            if persistenceController.usesCloudKit {
+                for object in context.insertedObjects {
+                    try persistenceController.assign(object, to: .private)
+                }
+            }
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(place)
         }
     }
 
     public func createRoom(_ draft: CreateRoomDraft) async throws -> RoomSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let place: Place = try Self.fetchActive(
-                    id: draft.placeID, entityName: "Place", in: context, notFound: .placeNotFound
-                )
-                let room: Room = try Self.insert("Room", into: context)
-                room.name = try Self.requiredName(draft.name)
-                room.sortOrder = Self.nextSortOrder(
-                    in: Self.managedObjects(place.rooms, as: Room.self).map(\.sortOrder)
-                )
-                room.place = place
-                room.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(room)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let place: Place = try Self.fetchActive(
+                id: draft.placeID, entityName: "Place", in: context, notFound: .placeNotFound
+            )
+            let room: Room = try Self.insert("Room", into: context)
+            room.name = try Self.requiredName(draft.name)
+            room.sortOrder = Self.nextSortOrder(
+                in: Self.managedObjects(place.rooms, as: Room.self).map(\.sortOrder)
+            )
+            room.place = place
+            room.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(room)
         }
     }
 
     public func createArea(_ draft: CreateAreaDraft) async throws -> AreaSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let room: Room = try Self.fetchOne(
-                    id: draft.roomID, entityName: "Room", in: context, notFound: .roomNotFound
-                )
-                guard Self.isActive(room), let place = room.place else {
-                    throw CatalogRepositoryError.roomNotFound
-                }
-                if let qrToken = draft.qrToken {
-                    guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
-                        throw CatalogRepositoryError.tokenAlreadyBound
-                    }
-                }
-                let area: Area = try Self.insert("Area", into: context)
-                area.name = try Self.requiredName(draft.name)
-                area.detail = Self.nilIfEmpty(draft.detail)
-                area.sortOrder = Self.nextSortOrder(
-                    in: Self.managedObjects(room.areas, as: Area.self).map(\.sortOrder)
-                )
-                area.room = room
-                area.place = place
-                if let photo = draft.photo {
-                    try Self.applyPhotoMutation(.replace(photo), to: .area(area), in: context)
-                }
-                if let qrToken = draft.qrToken {
-                    try Self.insertQRCode(
-                        qrToken,
-                        for: .area(area, place, try Self.requiredID(area.id)),
-                        in: context
-                    )
-                }
-                area.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(area)
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { context in
+            let room: Room = try Self.fetchOne(
+                id: draft.roomID, entityName: "Room", in: context, notFound: .roomNotFound
+            )
+            guard Self.isActive(room), let place = room.place else {
+                throw CatalogRepositoryError.roomNotFound
             }
+            if let qrToken = draft.qrToken {
+                guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
+                    throw CatalogRepositoryError.tokenAlreadyBound
+                }
+            }
+            let area: Area = try Self.insert("Area", into: context)
+            area.name = try Self.requiredName(draft.name)
+            area.detail = Self.nilIfEmpty(draft.detail)
+            area.sortOrder = Self.nextSortOrder(
+                in: Self.managedObjects(room.areas, as: Area.self).map(\.sortOrder)
+            )
+            area.room = room
+            area.place = place
+            if let photo = draft.photo {
+                try Self.applyPhotoMutation(.replace(photo), to: .area(area), in: context)
+            }
+            if let qrToken = draft.qrToken {
+                try Self.insertQRCode(
+                    qrToken,
+                    for: .area(area, place, try Self.requiredID(area.id)),
+                    in: context
+                )
+            }
+            area.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(area)
         }
     }
 
     public func createContainer(_ draft: CreateContainerDraft) async throws -> ContainerSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let parent = try Self.fetchContainerDestination(draft.destination, in: context)
-                if let qrToken = draft.qrToken {
-                    guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
-                        throw CatalogRepositoryError.tokenAlreadyBound
-                    }
+        try await mutate { context in
+            let parent = try Self.fetchContainerDestination(draft.destination, in: context)
+            if let qrToken = draft.qrToken {
+                guard try Self.fetchQRCodes(token: qrToken.rawValue, in: context).isEmpty else {
+                    throw CatalogRepositoryError.tokenAlreadyBound
                 }
-                let container: Container = try Self.insert("Container", into: context)
-                container.name = try Self.requiredName(draft.name)
-                container.detail = Self.nilIfEmpty(draft.detail)
-                container.sortOrder = Self.nextSortOrder(in: parent.childSortOrders)
-                container.place = parent.place
-                parent.apply(to: container)
-                if let photo = draft.photo {
-                    try Self.applyPhotoMutation(.replace(photo), to: .container(container), in: context)
-                }
-                if let qrToken = draft.qrToken {
-                    try Self.insertQRCode(
-                        qrToken,
-                        for: .container(
-                            container,
-                            parent.place,
-                            try Self.requiredID(container.id)
-                        ),
-                        in: context
-                    )
-                }
-                container.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: parent.place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(container)
-            } catch {
-                context.rollback()
-                throw error
             }
+            let container: Container = try Self.insert("Container", into: context)
+            container.name = try Self.requiredName(draft.name)
+            container.detail = Self.nilIfEmpty(draft.detail)
+            container.sortOrder = Self.nextSortOrder(in: parent.childSortOrders)
+            container.place = parent.place
+            parent.apply(to: container)
+            if let photo = draft.photo {
+                try Self.applyPhotoMutation(.replace(photo), to: .container(container), in: context)
+            }
+            if let qrToken = draft.qrToken {
+                try Self.insertQRCode(
+                    qrToken,
+                    for: .container(
+                        container,
+                        parent.place,
+                        try Self.requiredID(container.id)
+                    ),
+                    in: context
+                )
+            }
+            container.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: parent.place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(container)
         }
     }
 
     public func updatePlace(id: UUID, with draft: UpdatePlaceDraft) async throws -> PlaceSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let place: Place = try Self.fetchActive(
-                    id: id, entityName: "Place", in: context, notFound: .placeNotFound
-                )
-                place.name = try Self.requiredName(draft.name)
-                place.notes = Self.nilIfEmpty(draft.notes)
-                try Self.applyPhotoMutation(draft.photo, to: .place(place), in: context)
-                place.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(place)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let place: Place = try Self.fetchActive(
+                id: id, entityName: "Place", in: context, notFound: .placeNotFound
+            )
+            place.name = try Self.requiredName(draft.name)
+            place.notes = Self.nilIfEmpty(draft.notes)
+            try Self.applyPhotoMutation(draft.photo, to: .place(place), in: context)
+            place.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(place)
         }
     }
 
     public func updateRoom(id: UUID, with draft: UpdateRoomDraft) async throws -> RoomSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let room: Room = try Self.fetchOne(
-                    id: id, entityName: "Room", in: context, notFound: .roomNotFound
-                )
-                guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
-                room.name = try Self.requiredName(draft.name)
-                room.updatedAt = Date()
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(room)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let room: Room = try Self.fetchOne(
+                id: id, entityName: "Room", in: context, notFound: .roomNotFound
+            )
+            guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
+            room.name = try Self.requiredName(draft.name)
+            room.updatedAt = Date()
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(room)
         }
     }
 
     public func updateArea(id: UUID, with draft: UpdateAreaDraft) async throws -> AreaSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let area: Area = try Self.fetchOne(
-                    id: id, entityName: "Area", in: context, notFound: .areaNotFound
-                )
-                guard Self.isActive(area), let place = area.place else {
-                    throw CatalogRepositoryError.areaNotFound
-                }
-                let room: Room = try Self.fetchOne(
-                    id: draft.roomID, entityName: "Room", in: context, notFound: .destinationNotFound
-                )
-                guard Self.isActive(room) else { throw CatalogRepositoryError.destinationNotFound }
-                guard room.place === place else { throw CatalogRepositoryError.crossPlaceMove }
-
-                area.name = try Self.requiredName(draft.name)
-                area.detail = Self.nilIfEmpty(draft.detail)
-                area.room = room
-                try Self.applyPhotoMutation(draft.photo, to: .area(area), in: context)
-                area.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(area)
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { context in
+            let area: Area = try Self.fetchOne(
+                id: id, entityName: "Area", in: context, notFound: .areaNotFound
+            )
+            guard Self.isActive(area), let place = area.place else {
+                throw CatalogRepositoryError.areaNotFound
             }
+            let room: Room = try Self.fetchOne(
+                id: draft.roomID, entityName: "Room", in: context, notFound: .destinationNotFound
+            )
+            guard Self.isActive(room) else { throw CatalogRepositoryError.destinationNotFound }
+            guard room.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+
+            area.name = try Self.requiredName(draft.name)
+            area.detail = Self.nilIfEmpty(draft.detail)
+            area.room = room
+            try Self.applyPhotoMutation(draft.photo, to: .area(area), in: context)
+            area.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(area)
         }
     }
 
-    public func updateContainer(id: UUID, with draft: UpdateContainerDraft) async throws -> ContainerSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let container: Container = try Self.fetchOne(
-                    id: id, entityName: "Container", in: context, notFound: .containerNotFound
-                )
-                guard Self.isActive(container), let place = container.place else {
-                    throw CatalogRepositoryError.containerNotFound
-                }
-                let parent = try Self.fetchContainerDestination(draft.destination, in: context)
-                guard parent.place === place else { throw CatalogRepositoryError.crossPlaceMove }
-                if case .container = draft.destination {
-                    do {
-                        try Self.validateContainerMove(container, to: parent)
-                    } catch DomainValidationError.containerCycle {
-                        throw CatalogRepositoryError.containerCycle
-                    }
-                }
-
-                container.name = try Self.requiredName(draft.name)
-                container.detail = Self.nilIfEmpty(draft.detail)
-                parent.apply(to: container)
-                try Self.applyPhotoMutation(draft.photo, to: .container(container), in: context)
-                container.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(container)
-            } catch {
-                context.rollback()
-                throw error
+    public func updateContainer(id: UUID, with draft: UpdateContainerDraft) async throws
+        -> ContainerSnapshot
+    {
+        try await mutate { context in
+            let container: Container = try Self.fetchOne(
+                id: id, entityName: "Container", in: context, notFound: .containerNotFound
+            )
+            guard Self.isActive(container), let place = container.place else {
+                throw CatalogRepositoryError.containerNotFound
             }
+            let parent = try Self.fetchContainerDestination(draft.destination, in: context)
+            guard parent.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+            if case .container = draft.destination {
+                do {
+                    try Self.validateContainerMove(container, to: parent)
+                } catch DomainValidationError.containerCycle {
+                    throw CatalogRepositoryError.containerCycle
+                }
+            }
+
+            container.name = try Self.requiredName(draft.name)
+            container.detail = Self.nilIfEmpty(draft.detail)
+            parent.apply(to: container)
+            try Self.applyPhotoMutation(draft.photo, to: .container(container), in: context)
+            container.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(container)
         }
     }
 
     public func updateThing(id: UUID, with draft: UpdateThingDraft) async throws -> ThingSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let thing: Thing = try Self.fetchOne(
-                    id: id, entityName: "Thing", in: context, notFound: .thingNotFound
-                )
-                guard Self.isActive(thing), let place = thing.place else {
-                    throw CatalogRepositoryError.thingNotFound
-                }
-                let home = try Self.fetchHome(draft.destination, in: context)
-                guard home.place === place else { throw CatalogRepositoryError.crossPlaceMove }
-
-                let name = try Self.requiredName(draft.name)
-                let keywords = Self.normalizeKeywords(draft.keywords)
-                thing.name = name
-                thing.detail = Self.nilIfEmpty(draft.notes)
-                thing.homeRoom = nil
-                thing.homeArea = nil
-                thing.homeContainer = nil
-                home.apply(to: thing)
-                for keyword in Self.managedObjects(thing.keywords, as: ThingKeyword.self) {
-                    context.delete(keyword)
-                }
-                for displayValue in keywords {
-                    let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
-                    keyword.displayValue = displayValue
-                    keyword.normalizedValue = Self.searchNormalized(displayValue)
-                    keyword.source = thing.nameSource
-                    keyword.place = place
-                    keyword.thing = thing
-                }
-                thing.searchTextNormalized = Self.searchNormalized(
-                    ([name] + keywords + [thing.detail].compactMap { $0 }).joined(separator: " ")
-                )
-                try Self.applyPhotoMutation(draft.photo, to: .thing(thing), in: context)
-                thing.updatedAt = Date()
-                Self.assignInsertions(in: context, toStoreOf: place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(thing)
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { context in
+            let thing: Thing = try Self.fetchOne(
+                id: id, entityName: "Thing", in: context, notFound: .thingNotFound
+            )
+            guard Self.isActive(thing), let place = thing.place else {
+                throw CatalogRepositoryError.thingNotFound
             }
+            let home = try Self.fetchHome(draft.destination, in: context)
+            guard home.place === place else { throw CatalogRepositoryError.crossPlaceMove }
+
+            let name = try Self.requiredName(draft.name)
+            let keywords = Self.normalizeKeywords(draft.keywords)
+            thing.name = name
+            thing.detail = Self.nilIfEmpty(draft.notes)
+            thing.homeRoom = nil
+            thing.homeArea = nil
+            thing.homeContainer = nil
+            home.apply(to: thing)
+            for keyword in Self.managedObjects(thing.keywords, as: ThingKeyword.self) {
+                context.delete(keyword)
+            }
+            for displayValue in keywords {
+                let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
+                keyword.displayValue = displayValue
+                keyword.normalizedValue = Self.searchNormalized(displayValue)
+                keyword.source = thing.nameSource
+                keyword.place = place
+                keyword.thing = thing
+            }
+            thing.searchTextNormalized = Self.searchNormalized(
+                ([name] + keywords + [thing.detail].compactMap { $0 }).joined(separator: " ")
+            )
+            try Self.applyPhotoMutation(draft.photo, to: .thing(thing), in: context)
+            thing.updatedAt = Date()
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(thing)
         }
     }
 
     public func archivePlace(id: UUID) async throws -> PlaceSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let place: Place = try Self.fetchActive(
-                    id: id, entityName: "Place", in: context, notFound: .placeNotFound
-                )
-                let objects: [NSManagedObject] = [place]
-                    + Self.managedObjects(place.rooms, as: Room.self)
-                    + Self.managedObjects(place.areas, as: Area.self)
-                    + Self.managedObjects(place.containers, as: Container.self)
-                    + Self.managedObjects(place.things, as: Thing.self)
-                Self.archive(objects, at: Date())
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(place)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let place: Place = try Self.fetchActive(
+                id: id, entityName: "Place", in: context, notFound: .placeNotFound
+            )
+            let objects: [NSManagedObject] =
+                [place]
+                + Self.managedObjects(place.rooms, as: Room.self)
+                + Self.managedObjects(place.areas, as: Area.self)
+                + Self.managedObjects(place.containers, as: Container.self)
+                + Self.managedObjects(place.things, as: Thing.self)
+            Self.archive(objects, at: Date())
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(place)
         }
     }
 
     public func archiveRoom(id: UUID) async throws -> RoomSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let room: Room = try Self.fetchOne(
-                    id: id, entityName: "Room", in: context, notFound: .roomNotFound
-                )
-                guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
-                Self.archive(Self.archiveSubtree(for: room), at: Date())
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(room)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let room: Room = try Self.fetchOne(
+                id: id, entityName: "Room", in: context, notFound: .roomNotFound
+            )
+            guard Self.isActive(room) else { throw CatalogRepositoryError.roomNotFound }
+            Self.archive(Self.archiveSubtree(for: room), at: Date())
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(room)
         }
     }
 
     public func archiveArea(id: UUID) async throws -> AreaSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let area: Area = try Self.fetchOne(
-                    id: id, entityName: "Area", in: context, notFound: .areaNotFound
-                )
-                guard Self.isActive(area) else { throw CatalogRepositoryError.areaNotFound }
-                Self.archive(Self.archiveSubtree(for: area), at: Date())
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(area)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let area: Area = try Self.fetchOne(
+                id: id, entityName: "Area", in: context, notFound: .areaNotFound
+            )
+            guard Self.isActive(area) else { throw CatalogRepositoryError.areaNotFound }
+            Self.archive(Self.archiveSubtree(for: area), at: Date())
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(area)
         }
     }
 
     public func archiveContainer(id: UUID) async throws -> ContainerSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let container: Container = try Self.fetchOne(
-                    id: id, entityName: "Container", in: context, notFound: .containerNotFound
-                )
-                guard Self.isActive(container) else { throw CatalogRepositoryError.containerNotFound }
-                Self.archive(Self.archiveSubtree(for: container), at: Date())
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(container)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let container: Container = try Self.fetchOne(
+                id: id, entityName: "Container", in: context, notFound: .containerNotFound
+            )
+            guard Self.isActive(container) else { throw CatalogRepositoryError.containerNotFound }
+            Self.archive(Self.archiveSubtree(for: container), at: Date())
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(container)
         }
     }
 
     public func archiveThing(id: UUID) async throws -> ThingSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let thing: Thing = try Self.fetchOne(
-                    id: id, entityName: "Thing", in: context, notFound: .thingNotFound
-                )
-                guard Self.isActive(thing) else { throw CatalogRepositoryError.thingNotFound }
-                Self.archive([thing], at: Date())
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(thing)
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let thing: Thing = try Self.fetchOne(
+                id: id, entityName: "Thing", in: context, notFound: .thingNotFound
+            )
+            guard Self.isActive(thing) else { throw CatalogRepositoryError.thingNotFound }
+            Self.archive([thing], at: Date())
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(thing)
         }
     }
 
@@ -464,56 +345,47 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         _ draft: ReviewedThingDraft,
         to destination: ThingDestination
     ) async throws -> ThingSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let normalizedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                let normalizedSource = draft.nameSource.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !normalizedName.isEmpty, !normalizedSource.isEmpty else {
-                    throw CatalogRepositoryError.invalidDraft
-                }
-
-                let home = try Self.fetchHome(destination, in: context)
-                let thing: Thing = try Self.insert("Thing", into: context)
-                thing.name = normalizedName
-                thing.detail = Self.nilIfEmpty(draft.notes)
-                thing.nameSource = normalizedSource
-                thing.place = home.place
-                home.apply(to: thing)
-
-                let normalizedKeywords = Self.normalizeKeywords(draft.keywords)
-                for displayValue in normalizedKeywords {
-                    let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
-                    keyword.displayValue = displayValue
-                    keyword.normalizedValue = Self.searchNormalized(displayValue)
-                    keyword.source = normalizedSource
-                    keyword.place = home.place
-                    keyword.thing = thing
-                }
-                thing.searchTextNormalized = Self.searchNormalized(
-                    ([normalizedName] + normalizedKeywords + [thing.detail].compactMap { $0 }).joined(separator: " ")
-                )
-
-                if let photoDraft = draft.photo {
-                    try Self.applyPhotoMutation(.replace(photoDraft), to: .thing(thing), in: context)
-                }
-
-                Self.assignInsertions(in: context, toStoreOf: home.place)
-                try Self.validateChanges(in: context)
-                try context.save()
-                return try Self.snapshot(thing)
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { context in
+            let normalizedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedSource = draft.nameSource.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalizedName.isEmpty, !normalizedSource.isEmpty else {
+                throw CatalogRepositoryError.invalidDraft
             }
+
+            let home = try Self.fetchHome(destination, in: context)
+            let thing: Thing = try Self.insert("Thing", into: context)
+            thing.name = normalizedName
+            thing.detail = Self.nilIfEmpty(draft.notes)
+            thing.nameSource = normalizedSource
+            thing.place = home.place
+            home.apply(to: thing)
+
+            let normalizedKeywords = Self.normalizeKeywords(draft.keywords)
+            for displayValue in normalizedKeywords {
+                let keyword: ThingKeyword = try Self.insert("ThingKeyword", into: context)
+                keyword.displayValue = displayValue
+                keyword.normalizedValue = Self.searchNormalized(displayValue)
+                keyword.source = normalizedSource
+                keyword.place = home.place
+                keyword.thing = thing
+            }
+            thing.searchTextNormalized = Self.searchNormalized(
+                ([normalizedName] + normalizedKeywords + [thing.detail].compactMap { $0 }).joined(
+                    separator: " ")
+            )
+
+            if let photoDraft = draft.photo {
+                try Self.applyPhotoMutation(.replace(photoDraft), to: .thing(thing), in: context)
+            }
+
+            Self.assignInsertions(in: context, toStoreOf: home.place)
+            try Self.validateChanges(in: context)
+            return try Self.snapshot(thing)
         }
     }
 
     public func unassignedQRCodeTargets() async throws -> [QRAttachTargetSnapshot] {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
+        try await read { context in
             let areas = try context.fetch(NSFetchRequest<Area>(entityName: "Area"))
                 .filter { Self.isActive($0) && Self.boundQRCodes(of: $0.qrCodes).isEmpty }
                 .compactMap(Self.attachTarget(for:))
@@ -525,65 +397,48 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     }
 
     public func bindQRCode(_ request: QRCodeBindingRequest) async throws {
-        try ensurePersistenceLoaded()
-        try await context.perform { [context] in
-            context.reset()
-            do {
-                let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
-                if existing.count == 1,
-                   existing[0].state == "bound",
-                   Self.bindingTarget(for: existing[0]) == Self.rawTarget(request.target)
-                {
-                    return
-                }
-                guard existing.isEmpty else {
-                    throw CatalogRepositoryError.tokenAlreadyBound
-                }
-
-                let target = try Self.fetchQRTarget(request.target, in: context)
-                guard Self.boundQRCodes(of: target.qrCodes).isEmpty else {
-                    throw CatalogRepositoryError.targetAlreadyHasQRCode
-                }
-
-                try Self.insertQRCode(request.token, for: target, in: context)
-                try context.save()
-            } catch {
-                context.rollback()
-                throw error
+        try await mutate { context in
+            let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
+            if existing.count == 1,
+                existing[0].state == "bound",
+                Self.bindingTarget(for: existing[0]) == Self.rawTarget(request.target)
+            {
+                return
             }
+            guard existing.isEmpty else {
+                throw CatalogRepositoryError.tokenAlreadyBound
+            }
+
+            let target = try Self.fetchQRTarget(request.target, in: context)
+            guard Self.boundQRCodes(of: target.qrCodes).isEmpty else {
+                throw CatalogRepositoryError.targetAlreadyHasQRCode
+            }
+
+            try Self.insertQRCode(request.token, for: target, in: context)
         }
     }
 
     public func replaceQRCode(_ request: QRCodeBindingRequest) async throws {
-        try ensurePersistenceLoaded()
-        try await context.perform { [context] in
-            context.reset()
-            do {
-                let target = try Self.fetchQRTarget(request.target, in: context)
-                let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
-                let isSameTarget = existing.count == 1
-                    && existing[0].state == "bound"
-                    && existing[0].place === target.place
-                    && Self.bindingTarget(for: existing[0]) == target.target
+        try await mutate { context in
+            let target = try Self.fetchQRTarget(request.target, in: context)
+            let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
+            let isSameTarget =
+                existing.count == 1
+                && existing[0].state == "bound"
+                && existing[0].place === target.place
+                && Self.bindingTarget(for: existing[0]) == target.target
 
-                guard existing.isEmpty || isSameTarget else {
-                    throw CatalogRepositoryError.tokenAlreadyBound
-                }
+            guard existing.isEmpty || isSameTarget else {
+                throw CatalogRepositoryError.tokenAlreadyBound
+            }
 
-                let retainedQRCode = isSameTarget ? existing[0] : nil
-                for qrCode in Self.managedObjects(target.qrCodes, as: QRCode.self)
-                    where qrCode !== retainedQRCode
-                {
-                    context.delete(qrCode)
-                }
-                if retainedQRCode == nil {
-                    try Self.insertQRCode(request.token, for: target, in: context)
-                }
-
-                try context.save()
-            } catch {
-                context.rollback()
-                throw error
+            let retainedQRCode = isSameTarget ? existing[0] : nil
+            for qrCode in Self.managedObjects(target.qrCodes, as: QRCode.self)
+            where qrCode !== retainedQRCode {
+                context.delete(qrCode)
+            }
+            if retainedQRCode == nil {
+                try Self.insertQRCode(request.token, for: target, in: context)
             }
         }
     }
@@ -602,45 +457,34 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         _ request: QRCodeBindingRequest,
         replacingTargetQRCode: Bool
     ) async throws {
-        try ensurePersistenceLoaded()
-        try await context.perform { [context] in
-            context.reset()
-            do {
-                let repairRows = try Self.fetchQRCodes(
-                    token: request.token.rawValue,
+        try await mutate { context in
+            let repairRows = try Self.fetchQRCodes(
+                token: request.token.rawValue,
+                in: context
+            )
+            try Self.requireRepairable(repairRows)
+
+            let target = try Self.fetchQRTarget(request.target, in: context)
+            if !replacingTargetQRCode {
+                try Self.requireRepairTargetAvailable(
+                    target,
+                    for: request.token,
                     in: context
                 )
-                try Self.requireRepairable(repairRows)
-
-                let target = try Self.fetchQRTarget(request.target, in: context)
-                if !replacingTargetQRCode {
-                    try Self.requireRepairTargetAvailable(
-                        target,
-                        for: request.token,
-                        in: context
-                    )
-                }
-                try Self.consolidate(
-                    repairRows,
-                    token: request.token,
-                    onto: target,
-                    in: context
-                )
-
-                try context.save()
-            } catch {
-                context.rollback()
-                throw error
             }
+            try Self.consolidate(
+                repairRows,
+                token: request.token,
+                onto: target,
+                in: context
+            )
         }
     }
 
     public func repairQRCodeTargetIsEligible(
         _ request: QRCodeBindingRequest
     ) async throws -> Bool {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
+        try await read { context in
             let repairRows = try Self.fetchQRCodes(
                 token: request.token.rawValue,
                 in: context
@@ -661,18 +505,10 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     }
 
     public func releaseRepairableQRCode(_ token: QRToken) async throws {
-        try ensurePersistenceLoaded()
-        try await context.perform { [context] in
-            context.reset()
-            do {
-                let repairRows = try Self.fetchQRCodes(token: token.rawValue, in: context)
-                try Self.requireRepairable(repairRows)
-                repairRows.forEach(context.delete)
-                try context.save()
-            } catch {
-                context.rollback()
-                throw error
-            }
+        try await mutate { context in
+            let repairRows = try Self.fetchQRCodes(token: token.rawValue, in: context)
+            try Self.requireRepairable(repairRows)
+            repairRows.forEach(context.delete)
         }
     }
 
@@ -680,153 +516,105 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
     public func createTargetAndBindQRCode(
         _ request: CreateAndBindQRCodeRequest
     ) async throws -> QRAttachTargetSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                guard try Self.fetchQRCodes(token: request.token.rawValue, in: context).isEmpty else {
-                    throw CatalogRepositoryError.tokenAlreadyBound
-                }
-
-                let place: Place = try Self.fetchOne(
-                    id: request.placeID,
-                    entityName: "Place",
-                    in: context,
-                    notFound: .targetNotFound
-                )
-                guard place.archivedAt == nil else {
-                    throw CatalogRepositoryError.targetNotFound
-                }
-                let room = try Self.resolveRoom(request.room, in: place, context: context)
-                let area = try Self.resolveArea(request.area, in: room, place: place, context: context)
-                let target = try Self.resolveAttachment(
-                    request.attachment,
-                    in: area,
-                    place: place,
-                    context: context
-                )
-                guard Self.boundQRCodes(of: target.qrCodes).isEmpty else {
-                    throw CatalogRepositoryError.targetAlreadyHasQRCode
-                }
-
-                try Self.insertQRCode(request.token, for: target, in: context)
-
-                let inserted = Array(context.insertedObjects)
-                if let store = place.objectID.persistentStore {
-                    for object in inserted {
-                        context.assign(object, to: store)
-                    }
-                }
-                for object in inserted {
-                    try Self.validateInsertedObject(object)
-                }
-                let targetSnapshot: QRAttachTargetSnapshot
-                switch target.target {
-                case .area:
-                    guard let snapshot = Self.attachTarget(for: area) else {
-                        throw CatalogRepositoryError.invalidStoredHierarchy
-                    }
-                    targetSnapshot = snapshot
-                case .container:
-                    let container = try context.existingObject(with: target.objectID) as! Container
-                    guard let snapshot = Self.attachTarget(for: container) else {
-                        throw CatalogRepositoryError.invalidStoredHierarchy
-                    }
-                    targetSnapshot = snapshot
-                }
-                try context.save()
-                return targetSnapshot
-            } catch {
-                context.rollback()
-                throw error
-            }
-        }
+        try await createTargetAndBindQRCode(request, repairing: false)
     }
 
     @discardableResult
     public func repairCreateTargetAndBindQRCode(
         _ request: CreateAndBindQRCodeRequest
     ) async throws -> QRAttachTargetSnapshot {
-        try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
-            context.reset()
-            do {
-                let repairRows = try Self.fetchQRCodes(
-                    token: request.token.rawValue,
-                    in: context
-                )
-                try Self.requireRepairable(repairRows)
+        try await createTargetAndBindQRCode(request, repairing: true)
+    }
 
-                let place: Place = try Self.fetchOne(
-                    id: request.placeID,
-                    entityName: "Place",
-                    in: context,
-                    notFound: .targetNotFound
-                )
-                guard place.archivedAt == nil else {
-                    throw CatalogRepositoryError.targetNotFound
-                }
-                let room = try Self.resolveRoom(request.room, in: place, context: context)
-                let area = try Self.resolveArea(request.area, in: room, place: place, context: context)
-                let target = try Self.resolveAttachment(
-                    request.attachment,
-                    in: area,
-                    place: place,
-                    context: context
-                )
-                try Self.requireRepairTargetAvailable(
-                    target,
-                    for: request.token,
-                    in: context
-                )
+    private func createTargetAndBindQRCode(
+        _ request: CreateAndBindQRCodeRequest,
+        repairing: Bool
+    ) async throws -> QRAttachTargetSnapshot {
+        try await mutate { context in
+            let existingRows = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
+            if repairing {
+                try Self.requireRepairable(existingRows)
+            } else if !existingRows.isEmpty {
+                throw CatalogRepositoryError.tokenAlreadyBound
+            }
+
+            let place: Place = try Self.fetchOne(
+                id: request.placeID,
+                entityName: "Place",
+                in: context,
+                notFound: .targetNotFound
+            )
+            guard place.archivedAt == nil else {
+                throw CatalogRepositoryError.targetNotFound
+            }
+            let room = try Self.resolveRoom(request.room, in: place, context: context)
+            let area = try Self.resolveArea(request.area, in: room, place: place, context: context)
+            let target = try Self.resolveAttachment(
+                request.attachment,
+                in: area,
+                place: place,
+                context: context
+            )
+            if repairing {
+                try Self.requireRepairTargetAvailable(target, for: request.token, in: context)
                 try Self.consolidate(
-                    repairRows,
+                    existingRows,
                     token: request.token,
                     onto: target,
                     in: context
                 )
+            } else {
+                guard Self.boundQRCodes(of: target.qrCodes).isEmpty else {
+                    throw CatalogRepositoryError.targetAlreadyHasQRCode
+                }
+                try Self.insertQRCode(request.token, for: target, in: context)
+            }
 
-                let inserted = Array(context.insertedObjects)
-                if let store = place.objectID.persistentStore {
-                    for object in inserted {
-                        context.assign(object, to: store)
-                    }
-                }
-                for object in inserted {
-                    try Self.validateInsertedObject(object)
-                }
+            Self.assignInsertions(in: context, toStoreOf: place)
+            try Self.validateChanges(in: context)
 
-                let targetSnapshot: QRAttachTargetSnapshot
-                switch target.target {
-                case .area:
-                    guard let snapshot = Self.attachTarget(for: area) else {
-                        throw CatalogRepositoryError.invalidStoredHierarchy
-                    }
-                    targetSnapshot = snapshot
-                case .container:
-                    let container = try context.existingObject(with: target.objectID) as! Container
-                    guard let snapshot = Self.attachTarget(for: container) else {
-                        throw CatalogRepositoryError.invalidStoredHierarchy
-                    }
-                    targetSnapshot = snapshot
+            guard let snapshot = target.snapshot else {
+                throw CatalogRepositoryError.invalidStoredHierarchy
+            }
+            return snapshot
+        }
+    }
+
+    public func resolve(_ token: QRToken) async throws -> QRCodeResolution {
+        let storedResolution = try await read { context in
+            let rows = try Self.fetchQRCodes(token: token.rawValue, in: context)
+            return Self.storedResolution(for: rows)
+        }
+        return Self.publicResolution(storedResolution)
+    }
+
+    private func read<Result: Sendable>(
+        _ operation: @escaping @Sendable (NSManagedObjectContext) throws -> Result
+    ) async throws -> Result {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            return try operation(context)
+        }
+    }
+
+    private func mutate<Result: Sendable>(
+        _ operation: @escaping @Sendable (NSManagedObjectContext) throws -> Result
+    ) async throws -> Result {
+        try ensurePersistenceLoaded()
+        return try await context.perform { [context] in
+            context.reset()
+            do {
+                let result = try operation(context)
+                if context.hasChanges {
+                    try context.save()
                 }
-                try context.save()
-                return targetSnapshot
+                return result
             } catch {
                 context.rollback()
                 throw error
             }
         }
-    }
-
-    public func resolve(_ token: QRToken) async throws -> QRCodeResolution {
-        try ensurePersistenceLoaded()
-        let storedResolution = try await context.perform { [context] in
-            context.reset()
-            let rows = try Self.fetchQRCodes(token: token.rawValue, in: context)
-            return Self.storedResolution(for: rows)
-        }
-        return Self.publicResolution(storedResolution)
     }
 
     private func ensurePersistenceLoaded() throws {
@@ -999,6 +787,15 @@ private extension CoreDataCatalogRepository {
             switch self {
             case .area(_, _, let id): .area(id)
             case .container(_, _, let id): .container(id)
+            }
+        }
+
+        var snapshot: QRAttachTargetSnapshot? {
+            switch self {
+            case .area(let area, _, _):
+                CoreDataCatalogRepository.attachTarget(for: area)
+            case .container(let container, _, _):
+                CoreDataCatalogRepository.attachTarget(for: container)
             }
         }
 

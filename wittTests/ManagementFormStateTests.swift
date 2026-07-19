@@ -171,82 +171,126 @@ final class ManagementFormStateTests: XCTestCase {
         )
     }
 
-    func testAISuggestionOnlyClaimsNameWhenItSuppliesTheName() {
+    func testAIAssistedFormOnlyClaimsNameWhenItSuppliesTheName() {
         let suggestion = ThingLabelSuggestion(
             proposedName: "Flashlight",
             keywords: ["torch", "battery"],
             detail: "Black aluminum body."
         )
-        let userNamed = ManagementAISuggestionApplication.apply(
-            suggestion,
-            to: ManagementFormValues(name: "My Torch")
-        )
+        var userNamed = AIAssistedThingFormState()
+        userNamed.values.name = "My Torch"
+        let userNamedRequest = userNamed.beginAnalysis()
+        userNamed.apply(suggestion, requestID: userNamedRequest)
 
         XCTAssertEqual(userNamed.values.name, "My Torch")
         XCTAssertEqual(userNamed.values.parsedKeywords, ["torch", "battery"])
-        XCTAssertFalse(userNamed.suppliedName)
-        XCTAssertTrue(userNamed.suppliedKeywords)
-        XCTAssertTrue(userNamed.suppliedNotes)
+        XCTAssertEqual(userNamed.values.notes, "Black aluminum body.")
+        XCTAssertFalse(userNamed.nameWasAISupplied)
 
-        let aiNamed = ManagementAISuggestionApplication.apply(
-            suggestion,
-            to: ManagementFormValues()
-        )
+        var aiNamed = AIAssistedThingFormState()
+        let aiNamedRequest = aiNamed.beginAnalysis()
+        aiNamed.apply(suggestion, requestID: aiNamedRequest)
         XCTAssertEqual(aiNamed.values.name, "Flashlight")
-        XCTAssertTrue(aiNamed.suppliedName)
+        XCTAssertTrue(aiNamed.nameWasAISupplied)
 
-        let empty = ManagementAISuggestionApplication.apply(
+        var empty = AIAssistedThingFormState()
+        let emptyRequest = empty.beginAnalysis()
+        empty.apply(
             ThingLabelSuggestion(proposedName: "  ", detail: nil),
-            to: ManagementFormValues()
+            requestID: emptyRequest
         )
-        XCTAssertFalse(empty.suppliedName)
-        XCTAssertFalse(empty.suppliedKeywords)
-        XCTAssertFalse(empty.suppliedNotes)
+        XCTAssertEqual(empty.values, ManagementFormValues())
+        XCTAssertFalse(empty.nameWasAISupplied)
     }
 
-    func testAISuggestionPreservesManualEditsMadeWhileAnalysisWasPending() {
+    func testAIAssistedFormPreservesManualEditsMadeWhileAnalysisWasPending() {
         let suggestion = ThingLabelSuggestion(
             proposedName: "Flashlight",
             keywords: ["torch", "battery"],
             detail: "Black aluminum body."
         )
-        let current = ManagementFormValues(
+        var form = AIAssistedThingFormState()
+        form.values = ManagementFormValues(
             name: "My Torch",
             notes: "",
             keywords: ""
         )
+        let requestID = form.beginAnalysis()
+        form.markEdited(.name)
+        form.markEdited(.notes)
 
-        let application = ManagementAISuggestionApplication.apply(
-            suggestion,
-            to: current,
-            preserving: [.name, .notes]
-        )
+        form.apply(suggestion, requestID: requestID)
 
-        XCTAssertEqual(application.values.name, "My Torch")
-        XCTAssertEqual(application.values.notes, "")
-        XCTAssertEqual(application.values.parsedKeywords, ["torch", "battery"])
-        XCTAssertFalse(application.suppliedName)
-        XCTAssertFalse(application.suppliedNotes)
-        XCTAssertTrue(application.suppliedKeywords)
+        XCTAssertEqual(form.values.name, "My Torch")
+        XCTAssertEqual(form.values.notes, "")
+        XCTAssertEqual(form.values.parsedKeywords, ["torch", "battery"])
+        XCTAssertFalse(form.nameWasAISupplied)
     }
 
-    func testAISuggestionDoesNotFillAFieldThatWasEditedThenCleared() {
+    func testAIAssistedFormDoesNotFillAFieldThatWasEditedThenCleared() {
         let suggestion = ThingLabelSuggestion(
             proposedName: "Flashlight",
             keywords: ["torch"],
             detail: "Black aluminum body."
         )
+        var form = AIAssistedThingFormState()
+        let requestID = form.beginAnalysis()
+        form.markEdited(.name)
+        form.markEdited(.keywords)
+        form.markEdited(.notes)
 
-        let application = ManagementAISuggestionApplication.apply(
-            suggestion,
-            to: ManagementFormValues(),
-            preserving: [.name, .keywords, .notes]
-        )
+        form.apply(suggestion, requestID: requestID)
 
-        XCTAssertEqual(application.values, ManagementFormValues())
-        XCTAssertFalse(application.suppliedName)
-        XCTAssertFalse(application.suppliedKeywords)
-        XCTAssertFalse(application.suppliedNotes)
+        XCTAssertEqual(form.values, ManagementFormValues())
+        XCTAssertFalse(form.nameWasAISupplied)
+    }
+
+    func testAIAssistedFormIgnoresStaleResultsAndTracksSuccessfulState() {
+        var form = AIAssistedThingFormState()
+        let staleRequest = form.beginAnalysis()
+        let currentRequest = form.beginAnalysis()
+        let suggestion = ThingLabelSuggestion(proposedName: "Flashlight")
+
+        XCTAssertFalse(form.apply(suggestion, requestID: staleRequest))
+        XCTAssertTrue(form.isAnalyzing)
+        XCTAssertTrue(form.apply(suggestion, requestID: currentRequest))
+        XCTAssertTrue(form.analysisSucceeded)
+        XCTAssertEqual(form.values.name, "Flashlight")
+        XCTAssertTrue(form.nameWasAISupplied)
+    }
+
+    func testAIAssistedFormDiscardsOnlyUnchangedSuggestions() {
+        var form = AIAssistedThingFormState()
+        let requestID = form.beginAnalysis()
+        XCTAssertTrue(form.apply(
+            ThingLabelSuggestion(
+                proposedName: "Flashlight",
+                keywords: ["torch"],
+                detail: "Black aluminum body."
+            ),
+            requestID: requestID
+        ))
+        form.values.name = "Camping Light"
+
+        form.discardCurrentSuggestions()
+
+        XCTAssertEqual(form.values.name, "Camping Light")
+        XCTAssertTrue(form.values.keywords.isEmpty)
+        XCTAssertTrue(form.values.notes.isEmpty)
+        XCTAssertFalse(form.analysisSucceeded)
+        XCTAssertFalse(form.nameWasAISupplied)
+    }
+
+    func testAIAssistedFormReportsOnlyTheCurrentRequestsFailure() {
+        var form = AIAssistedThingFormState()
+        let staleRequest = form.beginAnalysis()
+        let currentRequest = form.beginAnalysis()
+
+        XCTAssertFalse(form.fail(requestID: staleRequest, message: "Old"))
+        XCTAssertNil(form.analysisError)
+        XCTAssertTrue(form.fail(requestID: currentRequest, message: "Unavailable"))
+        XCTAssertEqual(form.analysisError, "Unavailable")
+        XCTAssertFalse(form.isAnalyzing)
     }
 
     private func makePhoto() -> NormalizedPhoto {

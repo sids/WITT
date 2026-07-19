@@ -719,17 +719,10 @@ struct ThingManagementForm: View {
     let onCreated: (ThingSnapshot) -> Void
     let onFinished: () -> Void
     @Environment(\.thingPhotoLabelingService) private var labelingService
-    @State private var values = ManagementFormValues()
+    @State private var form = AIAssistedThingFormState()
     @State private var destination: ThingDestination?
     @State private var photo: ManagementPhotoSelection = .unchanged
     @State private var initialized = false
-    @State private var isAnalyzing = false
-    @State private var analysisError: String?
-    @State private var analysisRequestID: UUID?
-    @State private var editedFields: Set<ManagementAIEditableField> = []
-    @State private var aiAppliedName: String?
-    @State private var aiAppliedKeywords: String?
-    @State private var aiAppliedNotes: String?
     @State private var confirmsArchive = false
     @FocusState private var isNameFocused: Bool
 
@@ -749,9 +742,9 @@ struct ThingManagementForm: View {
         Group {
             if isAvailable {
                 Form {
-                    if isAnalyzing {
+                    if form.isAnalyzing {
                         Section { ProgressView("Analyzing photo") }
-                    } else if let analysisError {
+                    } else if let analysisError = form.analysisError {
                         Section {
                             Label(analysisError, systemImage: "exclamationmark.triangle").foregroundStyle(
                                 .secondary)
@@ -792,7 +785,7 @@ struct ThingManagementForm: View {
         .toolbar {
             editorToolbar(
                 save: save,
-                disabled: values.normalizedName.isEmpty || !hasValidDestination || isSaving,
+                disabled: form.values.normalizedName.isEmpty || !hasValidDestination || isSaving,
                 isCommitting: $isSaving
             )
         }
@@ -814,9 +807,9 @@ struct ThingManagementForm: View {
     private func initialize() {
         guard !initialized else { return }
         initialized = true
-        values.name = thing?.name ?? ""
-        values.notes = thing?.notes ?? ""
-        values.keywords = thing?.keywords.joined(separator: ", ") ?? ""
+        form.values.name = thing?.name ?? ""
+        form.values.notes = thing?.notes ?? ""
+        form.values.keywords = thing?.keywords.joined(separator: ", ") ?? ""
         destination =
             thing.map { ThingDestination(home: $0.home) }
             ?? ManagementPreselection.thingDestination(context: contextDestination, options: options)
@@ -828,92 +821,55 @@ struct ThingManagementForm: View {
 
     private var nameBinding: Binding<String> {
         Binding(
-            get: { values.name },
+            get: { form.values.name },
             set: { newValue in
-                markEdited(.name)
-                values.name = newValue
+                form.markEdited(.name)
+                form.values.name = newValue
             })
     }
 
     private var keywordsBinding: Binding<String> {
         Binding(
-            get: { values.keywords },
+            get: { form.values.keywords },
             set: { newValue in
-                markEdited(.keywords)
-                values.keywords = newValue
+                form.markEdited(.keywords)
+                form.values.keywords = newValue
             })
     }
 
     private var notesBinding: Binding<String> {
         Binding(
-            get: { values.notes },
+            get: { form.values.notes },
             set: { newValue in
-                markEdited(.notes)
-                values.notes = newValue
+                form.markEdited(.notes)
+                form.values.notes = newValue
             })
-    }
-
-    private func markEdited(_ field: ManagementAIEditableField) {
-        guard analysisRequestID != nil else { return }
-        editedFields.insert(field)
     }
 
     private func beginAnalysisIfNeeded(_ selected: NormalizedPhoto) {
         guard thingID == nil else { return }
-        discardCurrentAISuggestions()
-        let requestID = UUID()
-        analysisRequestID = requestID
-        editedFields = []
-        isAnalyzing = true
-        analysisError = nil
+        let requestID = form.beginAnalysis(discardingAppliedValues: true)
         Task { await analyze(selected, requestID: requestID) }
     }
 
     @MainActor private func analyze(_ selected: NormalizedPhoto, requestID: UUID) async {
         do {
             let suggestion = try await labelingService.suggestLabel(for: selected.photoInput)
-            guard analysisRequestID == requestID else { return }
-            let application = ManagementAISuggestionApplication.apply(
-                suggestion,
-                to: values,
-                preserving: editedFields
-            )
-            analysisRequestID = nil
-            values = application.values
-            aiAppliedName = application.suppliedName ? values.normalizedName : nil
-            aiAppliedKeywords =
-                application.suppliedKeywords ? values.parsedKeywords.joined(separator: ", ") : nil
-            aiAppliedNotes = application.suppliedNotes ? values.normalizedNotes : nil
+            form.apply(suggestion, requestID: requestID)
         } catch {
-            guard analysisRequestID == requestID else { return }
-            analysisRequestID = nil
-            analysisError = "AI labeling is unavailable. Enter the details manually."
+            form.fail(
+                requestID: requestID,
+                message: "AI labeling is unavailable. Enter the details manually."
+            )
         }
-        guard analysisRequestID == nil else { return }
-        isAnalyzing = false
     }
 
     private func discardCurrentAISuggestions() {
-        invalidateAnalysis()
-        analysisError = nil
-        if let aiAppliedName, values.normalizedName == aiAppliedName {
-            values.name = ""
-        }
-        if let aiAppliedKeywords, values.parsedKeywords.joined(separator: ", ") == aiAppliedKeywords {
-            values.keywords = ""
-        }
-        if let aiAppliedNotes, values.normalizedNotes == aiAppliedNotes {
-            values.notes = ""
-        }
-        self.aiAppliedName = nil
-        self.aiAppliedKeywords = nil
-        self.aiAppliedNotes = nil
+        form.discardCurrentSuggestions()
     }
 
     private func invalidateAnalysis() {
-        analysisRequestID = nil
-        isAnalyzing = false
-        editedFields = []
+        form.invalidateAnalysis()
     }
 
     private func save() async {
@@ -927,17 +883,22 @@ struct ThingManagementForm: View {
                 await store.updateThing(
                     id: thingID,
                     with: UpdateThingDraft(
-                        name: values.normalizedName, keywords: values.parsedKeywords,
-                        notes: values.normalizedNotes, destination: destination, photo: photo.updateMutation))
+                        name: form.values.normalizedName,
+                        keywords: form.values.parsedKeywords,
+                        notes: form.values.normalizedNotes,
+                        destination: destination,
+                        photo: photo.updateMutation))
                 != nil
             isSaving = false
             if succeeded { onFinished() }
         } else {
-            let nameWasAISupplied = aiAppliedName.map { $0 == values.normalizedName } == true
             let saved = await store.saveThing(
-                name: values.normalizedName, keywords: values.parsedKeywords,
-                notes: values.normalizedNotes ?? "", photo: photo.createPhoto, to: destination,
-                nameSource: nameWasAISupplied ? "ai-reviewed" : "user")
+                name: form.values.normalizedName,
+                keywords: form.values.parsedKeywords,
+                notes: form.values.normalizedNotes ?? "",
+                photo: photo.createPhoto,
+                to: destination,
+                nameSource: form.nameWasAISupplied ? "ai-reviewed" : "user")
             isSaving = false
             if let saved { onCreated(saved) }
         }

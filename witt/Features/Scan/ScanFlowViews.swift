@@ -370,14 +370,8 @@ struct ReviewThingView: View {
     let onSaved: (ThingSnapshot) -> Void
     @Environment(\.thingPhotoLabelingService) private var labelingService
 
-    @State private var values = ManagementFormValues()
-    @State private var isAnalyzing = false
+    @State private var form = AIAssistedThingFormState()
     @State private var isSaving = false
-    @State private var analysisSucceeded = false
-    @State private var analysisError: String?
-    @State private var analysisRequestID: UUID?
-    @State private var editedFields: Set<ManagementAIEditableField> = []
-    @State private var aiAppliedName: String?
 
     private var location: String {
         store.locationComponents(for: destination).joined(separator: " · ")
@@ -397,15 +391,15 @@ struct ReviewThingView: View {
             }
 
             Section {
-                if isAnalyzing {
+                if form.isAnalyzing {
                     ProgressView("Analyzing photo")
-                } else if let analysisError {
+                } else if let analysisError = form.analysisError {
                     Label(analysisError, systemImage: "exclamationmark.triangle")
                     Button("Try Again") {
                         Task { await analyzePhoto() }
                     }
                     .disabled(photo == nil)
-                } else if analysisSucceeded {
+                } else if form.analysisSucceeded {
                     Label("AI suggestion ready", systemImage: "sparkles")
                         .foregroundStyle(.tint)
                 }
@@ -430,7 +424,7 @@ struct ReviewThingView: View {
                 }
                 .disabled(
                     isSaving
-                        || values.normalizedName.isEmpty
+                        || form.values.normalizedName.isEmpty
                 )
                 .accessibilityIdentifier("review.save")
             }
@@ -443,34 +437,29 @@ struct ReviewThingView: View {
 
     private var nameBinding: Binding<String> {
         Binding(
-            get: { values.name },
+            get: { form.values.name },
             set: { newValue in
-                markEdited(.name)
-                values.name = newValue
+                form.markEdited(.name)
+                form.values.name = newValue
             })
     }
 
     private var keywordsBinding: Binding<String> {
         Binding(
-            get: { values.keywords },
+            get: { form.values.keywords },
             set: { newValue in
-                markEdited(.keywords)
-                values.keywords = newValue
+                form.markEdited(.keywords)
+                form.values.keywords = newValue
             })
     }
 
     private var notesBinding: Binding<String> {
         Binding(
-            get: { values.notes },
+            get: { form.values.notes },
             set: { newValue in
-                markEdited(.notes)
-                values.notes = newValue
+                form.markEdited(.notes)
+                form.values.notes = newValue
             })
-    }
-
-    private func markEdited(_ field: ManagementAIEditableField) {
-        guard analysisRequestID != nil else { return }
-        editedFields.insert(field)
     }
 
     private func analyzePhoto() async {
@@ -479,55 +468,36 @@ struct ReviewThingView: View {
             return
         }
 
-        let requestID = UUID()
-        analysisRequestID = requestID
-        editedFields = []
-        isAnalyzing = true
-        analysisSucceeded = false
-        analysisError = nil
+        let requestID = form.beginAnalysis()
         do {
             let suggestion = try await labelingService.suggestLabel(for: photo.photoInput)
-            guard !Task.isCancelled, analysisRequestID == requestID else { return }
-            let application = ManagementAISuggestionApplication.apply(
-                suggestion,
-                to: values,
-                preserving: editedFields
-            )
-            analysisRequestID = nil
-            values = application.values
-            if application.suppliedName {
-                aiAppliedName = values.normalizedName
-            }
-            analysisSucceeded = true
+            guard !Task.isCancelled else { return }
+            form.apply(suggestion, requestID: requestID)
         } catch is CancellationError {
-            guard analysisRequestID == requestID else { return }
-            analysisRequestID = nil
+            form.cancel(requestID: requestID)
         } catch {
-            guard !Task.isCancelled, analysisRequestID == requestID else { return }
-            analysisRequestID = nil
-            analysisError = "AI labeling is unavailable. You can enter the details manually."
+            guard !Task.isCancelled else { return }
+            form.fail(
+                requestID: requestID,
+                message: "AI labeling is unavailable. You can enter the details manually."
+            )
         }
-        guard analysisRequestID == nil else { return }
-        isAnalyzing = false
     }
 
     private func invalidateAnalysis() {
-        analysisRequestID = nil
-        isAnalyzing = false
-        editedFields = []
+        form.invalidateAnalysis()
     }
 
     private func save() async {
         invalidateAnalysis()
         isSaving = true
-        let nameWasAISupplied = aiAppliedName.map { $0 == values.normalizedName } == true
         let saved = await store.saveThing(
-            name: values.normalizedName,
-            keywords: values.parsedKeywords,
-            notes: values.normalizedNotes ?? "",
+            name: form.values.normalizedName,
+            keywords: form.values.parsedKeywords,
+            notes: form.values.normalizedNotes ?? "",
             photo: photo,
             to: destination,
-            nameSource: nameWasAISupplied ? "ai-reviewed" : "user"
+            nameSource: form.nameWasAISupplied ? "ai-reviewed" : "user"
         )
         isSaving = false
         if let saved { onSaved(saved) }

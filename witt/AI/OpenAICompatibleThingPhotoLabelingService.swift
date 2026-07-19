@@ -13,9 +13,35 @@ public struct OpenAICompatibleThingPhotoLabelingConfiguration: Hashable, Sendabl
         maxPhotoSize: Int = 8 * 1_024 * 1_024
     ) {
         self.endpointURL = endpointURL
-        self.model = model
+        self.model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         self.timeout = timeout
         self.maxPhotoSize = maxPhotoSize
+    }
+
+    nonisolated var isValid: Bool {
+        Self.isAllowedEndpoint(endpointURL)
+            && !model.isEmpty
+            && timeout > 0
+            && maxPhotoSize > 0
+    }
+
+    nonisolated static func isAllowedEndpoint(_ url: URL) -> Bool {
+        guard
+            let scheme = url.scheme?.lowercased(),
+            url.host != nil,
+            url.user == nil,
+            url.password == nil,
+            url.fragment == nil
+        else {
+            return false
+        }
+        if scheme == "https" {
+            return true
+        }
+        guard scheme == "http", let host = url.host?.lowercased() else {
+            return false
+        }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 }
 
@@ -97,10 +123,7 @@ public final class OpenAICompatibleThingPhotoLabelingService: ThingPhotoLabeling
     }
 
     private func validate(_ photo: PhotoInput) throws {
-        guard Self.isAllowedEndpoint(configuration.endpointURL),
-              !configuration.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              configuration.timeout > 0,
-              configuration.maxPhotoSize > 0 else {
+        guard configuration.isValid else {
             throw ThingPhotoLabelingError.serviceUnavailable
         }
 
@@ -143,7 +166,7 @@ public final class OpenAICompatibleThingPhotoLabelingService: ThingPhotoLabeling
             "additionalProperties": false
         ]
         let body: [String: Any] = [
-            "model": configuration.model.trimmingCharacters(in: .whitespacesAndNewlines),
+            "model": configuration.model,
             "store": false,
             "max_output_tokens": Self.maxOutputTokens,
             "input": [
@@ -258,25 +281,6 @@ public final class OpenAICompatibleThingPhotoLabelingService: ThingPhotoLabeling
         default:
             return .connectionUnavailable
         }
-    }
-
-    nonisolated static func isAllowedEndpoint(_ url: URL) -> Bool {
-        guard
-            let scheme = url.scheme?.lowercased(),
-            url.host != nil,
-            url.user == nil,
-            url.password == nil,
-            url.fragment == nil
-        else {
-            return false
-        }
-        if scheme == "https" {
-            return true
-        }
-        guard scheme == "http", let host = url.host?.lowercased() else {
-            return false
-        }
-        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     nonisolated private static func normalizedWhitespace(_ value: String) -> String {

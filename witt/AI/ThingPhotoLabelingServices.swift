@@ -39,18 +39,18 @@ public enum ThingPhotoLabelingServices {
 
         if let endpointValue,
            let endpointURL = URL(string: endpointValue),
-           OpenAICompatibleThingPhotoLabelingService.isAllowedEndpoint(endpointURL),
-           let model,
-           !model.isEmpty {
+           let model {
             let configuration = OpenAICompatibleThingPhotoLabelingConfiguration(
                 endpointURL: endpointURL,
                 model: model
             )
-            return OpenAICompatibleThingPhotoLabelingService(
-                configuration: configuration,
-                bearerTokenProvider: { token },
-                session: session
-            )
+            if configuration.isValid {
+                return OpenAICompatibleThingPhotoLabelingService(
+                    configuration: configuration,
+                    bearerTokenProvider: { token },
+                    session: session
+                )
+            }
         }
 
         if endpointValue != nil || model != nil || token != nil {

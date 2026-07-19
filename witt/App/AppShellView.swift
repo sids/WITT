@@ -145,14 +145,7 @@ struct AppShellView: View {
         Task {
             defer { isRoutingQRCode = false }
             do {
-                switch try await deepLinkRouter.destination(for: url) {
-                case .addThing(let destination):
-                    presentedScan = ScanPresentation(flow: .capture(destination))
-                case .attach(let token):
-                    presentedScan = ScanPresentation(flow: .attach(token))
-                case .repair(let route):
-                    presentedScan = ScanPresentation(flow: .repair(route))
-                }
+                present(try await deepLinkRouter.destination(for: url))
             } catch {
                 deepLinkAlert = DeepLinkAlert(
                     title: "Invalid WITT Code",
@@ -188,20 +181,24 @@ struct AppShellView: View {
         Task {
             defer { isRoutingQRCode = false }
             do {
-                switch try await deepLinkRouter.destination(for: token) {
-                case .addThing(let destination):
-                    presentedScan = ScanPresentation(flow: .capture(destination))
-                case .attach(let token):
-                    presentedScan = ScanPresentation(flow: .attach(token))
-                case .repair(let route):
-                    presentedScan = ScanPresentation(flow: .repair(route))
-                }
+                present(try await deepLinkRouter.destination(for: token))
             } catch {
                 deepLinkAlert = DeepLinkAlert(
                     title: "Unable to Read QR Code",
                     message: "WITT could not look up this QR code. Try scanning it again."
                 )
             }
+        }
+    }
+
+    private func present(_ destination: QRDeepLinkDestination) {
+        switch destination {
+        case .addThing(let destination):
+            presentedScan = ScanPresentation(flow: .capture(destination))
+        case .attach(let token):
+            presentedScan = ScanPresentation(flow: .attach(token))
+        case .repair(let route):
+            presentedScan = ScanPresentation(flow: .repair(route))
         }
     }
 
