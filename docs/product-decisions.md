@@ -207,7 +207,3 @@ Promote targeted handling when evidence shows one of these conditions:
 - users cannot tell which value is current or safely repair it.
 
 Respond to the observed conflict class rather than building a generic merge system. Invariant-threatening operations may need repository-level reconciliation or an explicit retry; frequently overwritten descriptive fields may need lightweight "changed elsewhere" messaging. Full conflict history remains deferred unless simpler handling fails.
-
-## QR-003 Reference
-
-`QR-003` is complete. Runtime writes and reads of `QRCode.lastScannedAt` are retired because version 1 has no scan-history behavior. The optional deployed Core Data attribute remains only for additive CloudKit/store compatibility, and legacy values are preserved without influencing the product. None of the recommendations above depend on scan-recency metadata.

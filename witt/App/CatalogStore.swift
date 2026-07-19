@@ -34,6 +34,7 @@ final class CatalogStore: ObservableObject {
         places.filter { $0.archivedAt == nil }
     }
 
+#if DEBUG
     var defaultThingDestination: ThingDestination? {
         guard let place = activePlaces.first else { return nil }
         if let container = place.activeContainers.first {
@@ -46,6 +47,7 @@ final class CatalogStore: ObservableObject {
             .room($0.id)
         }
     }
+#endif
 
     func isPlaceShared(_ placeID: UUID) -> Bool {
         placeSharingStates[placeID]?.isShared == true

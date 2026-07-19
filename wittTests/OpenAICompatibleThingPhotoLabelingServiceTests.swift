@@ -239,7 +239,7 @@ final class OpenAICompatibleThingPhotoLabelingServiceTests: XCTestCase {
         ])
 
         #if DEBUG
-        XCTAssertTrue(missing is MockThingPhotoLabelingService)
+        XCTAssertTrue(missing is DebugThingPhotoLabelingService)
         #else
         XCTAssertTrue(missing is UnavailableThingPhotoLabelingService)
         #endif

@@ -1,5 +1,19 @@
 import Foundation
 
+#if DEBUG
+struct DebugThingPhotoLabelingService: ThingPhotoLabelingService {
+    func suggestLabel(for photo: PhotoInput) async throws -> ThingLabelSuggestion {
+        try await Task.sleep(for: .milliseconds(250))
+        return ThingLabelSuggestion(
+            proposedName: "LED Flashlight",
+            keywords: ["flashlight", "torch", "emergency", "battery"],
+            detail: "Compact black flashlight.",
+            confidence: 0.94
+        )
+    }
+}
+#endif
+
 public struct UnavailableThingPhotoLabelingService: ThingPhotoLabelingService {
     public init() {}
 
@@ -44,7 +58,7 @@ public enum ThingPhotoLabelingServices {
         }
 
         #if DEBUG
-        return MockThingPhotoLabelingService.demo
+        return DebugThingPhotoLabelingService()
         #else
         return UnavailableThingPhotoLabelingService()
         #endif

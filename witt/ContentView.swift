@@ -59,11 +59,7 @@ struct ContentView: View {
     }
 
     private var appContent: some View {
-        AppShellView(
-            store: store,
-            initialScan: initialScan,
-            qrResolver: store.repository
-        )
+        appShell
         .environment(\.thingPhotoLabelingService, labelingService)
         .task {
             await store.bootstrap()
@@ -79,8 +75,17 @@ struct ContentView: View {
         }
     }
 
-    private var initialScan: ScanDemo? {
+    @ViewBuilder
+    private var appShell: some View {
 #if DEBUG
+        AppShellView(store: store, initialScan: initialScan, qrResolver: store.repository)
+#else
+        AppShellView(store: store, qrResolver: store.repository)
+#endif
+    }
+
+#if DEBUG
+    private var initialScan: ScanDemo? {
         if ProcessInfo.processInfo.arguments.contains("--demo-known-qr") {
             return .known
         }
@@ -96,9 +101,9 @@ struct ContentView: View {
         if ProcessInfo.processInfo.arguments.contains("--demo-repair-qr") {
             return .repair
         }
-#endif
         return nil
     }
+#endif
 }
 
 #Preview("App Shell") {

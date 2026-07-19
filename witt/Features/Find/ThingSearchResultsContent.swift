@@ -1,26 +1,5 @@
 import SwiftUI
 
-struct FindView: View {
-    @ObservedObject var store: CatalogStore
-    @State private var query = ""
-    @State private var path: [UUID] = []
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            ThingSearchResultsContent(store: store, query: query) { thing in
-                path.append(thing.id)
-            }
-            .navigationTitle("Find")
-            .searchable(text: $query, prompt: "Things, keywords, or places")
-            .refreshable { await store.reload() }
-            .accessibilityIdentifier("find.searchResults")
-            .navigationDestination(for: UUID.self) { thingID in
-                ThingDetailView(store: store, thingID: thingID)
-            }
-        }
-    }
-}
-
 struct ThingSearchResultsContent: View {
     @ObservedObject var store: CatalogStore
     let query: String
@@ -62,11 +41,4 @@ struct ThingSearchResultsContent: View {
         }
         .refreshable { await store.reload() }
     }
-}
-
-#Preview("Find") {
-    let persistence = PersistenceController.inMemory()
-    let store = CatalogStore(persistence: persistence)
-    FindView(store: store)
-        .task { await store.bootstrap() }
 }

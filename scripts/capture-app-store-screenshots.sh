@@ -52,6 +52,7 @@ require_command() {
 }
 
 require_udid() {
+    require_command xcrun
     [[ -n "${SIMULATOR_UDID}" ]] || fail "set WITT_SIMULATOR_UDID to an already booted Simulator UDID"
     xcrun simctl getenv "${SIMULATOR_UDID}" HOME >/dev/null 2>&1 \
         || fail "Simulator ${SIMULATOR_UDID} is unavailable or not booted"
@@ -127,12 +128,10 @@ launch_app() {
 }
 
 main() {
-    require_command xcrun
-    require_command xcodebuild
-
     local command="${1:-}"
     case "${command}" in
         devices)
+            require_command xcrun
             xcrun simctl list devices available
             ;;
         demos)
@@ -140,6 +139,7 @@ main() {
             ;;
         build)
             require_udid
+            require_command xcodebuild
             xcodebuild \
                 -project "${PROJECT_PATH}" \
                 -scheme "${SCHEME}" \

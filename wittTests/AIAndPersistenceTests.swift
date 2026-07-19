@@ -2,9 +2,7 @@ import CoreData
 import XCTest
 @testable import witt
 
-final class ThingPhotoLabelingTests: XCTestCase {
-    private let photo = PhotoInput(data: Data([0x01]), contentType: "image/jpeg")
-
+final class ThingKeywordNormalizerTests: XCTestCase {
     func testKeywordNormalizerTrimsWhitespaceAndDeduplicatesCaseAndDiacritics() {
         XCTAssertEqual(
             ThingKeywordNormalizer.normalize(["  Power   Cable ", "power cable", "CAFÉ", "cafe", "\n", "USB-C"]),
@@ -12,39 +10,6 @@ final class ThingPhotoLabelingTests: XCTestCase {
         )
     }
 
-    func testMockSuccessReturnsConfiguredSuggestion() async throws {
-        let expected = ThingLabelSuggestion(
-            proposedName: "Power adapter",
-            keywords: ["adapter", "electronics"],
-            detail: "65 W",
-            confidence: 0.9
-        )
-        let service = MockThingPhotoLabelingService(mode: .success(expected))
-        let actual = try await service.suggestLabel(for: photo)
-
-        XCTAssertEqual(actual, expected)
-    }
-
-    func testMockDelayedSuccessEventuallyReturnsConfiguredSuggestion() async throws {
-        let expected = ThingLabelSuggestion(proposedName: "Cable")
-        let service = MockThingPhotoLabelingService(
-            mode: .delayedSuccess(expected, delay: .milliseconds(1))
-        )
-        let actual = try await service.suggestLabel(for: photo)
-
-        XCTAssertEqual(actual, expected)
-    }
-
-    func testMockFailureThrowsConfiguredError() async {
-        let service = MockThingPhotoLabelingService(mode: .failure(.serviceUnavailable))
-
-        do {
-            _ = try await service.suggestLabel(for: photo)
-            XCTFail("Expected the mock service to throw")
-        } catch {
-            XCTAssertEqual(error as? ThingPhotoLabelingError, .serviceUnavailable)
-        }
-    }
 }
 
 final class PersistenceControllerTests: XCTestCase {

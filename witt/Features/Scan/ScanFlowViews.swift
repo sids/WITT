@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import UIKit
 
+#if DEBUG
 enum ScanDemo: String, Identifiable {
     case known
     case unknown
@@ -11,6 +12,7 @@ enum ScanDemo: String, Identifiable {
 
     var id: String { rawValue }
 }
+#endif
 
 struct ScanView: View {
     let isPaused: Bool

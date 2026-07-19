@@ -2,13 +2,11 @@
 
 This document defines the production boundary prepared for AI-001. It does not activate live AI, select a provider, or authorize shipping. WITT must continue to work through manual Thing entry when labeling is absent or fails, and the iOS app must never contain a long-lived provider or relay credential.
 
-## Prepared Code
+## Implementation Posture
 
-- `RelayThingPhotoLabelingService` is an unwired, provider-neutral HTTPS client for a WITT-owned relay. Its default ephemeral session rejects redirects, cookies, and local response caching; successful responses must be bounded JSON from the configured endpoint.
-- `ThingPhotoLabelingRelayCredential` models a mobile credential issued for at most ten minutes, with an optional DPoP proof. The relay client rejects expired, nearly expired, overlong, or header-unsafe credentials before sending a photo.
-- `ThingPhotoLabelingEvaluator` deterministically scores naming, keywords, details, refusal, irrelevant text, manual fallback, and latency.
-- `wittTests/AIFixtures/representative-evaluation.json` contains passing and deliberately failing golden observations for representative scenarios. Its `image_id` values bind to a separately controlled photo corpus; household photos are intentionally not committed to git.
-- `ThingPhotoLabelingServices.appDefault()` is unchanged. Release builds remain unavailable unless the existing environment-only Responses adapter is explicitly configured, and the new relay is not selected by any runtime path.
+The relay/auth design and evaluation gates below are requirements, not speculative app code. WITT does not currently compile a relay client, credential model, synthetic evaluator, or evaluation fixture into the application. Those modules should be implemented only after the backend, mobile-auth strategy, provider, and consented evaluation corpus are chosen, so their interfaces follow real deployment constraints.
+
+`ThingPhotoLabelingServices.appDefault()` remains unchanged. Release builds use manual entry unless the existing environment-only Responses adapter is explicitly configured.
 
 The existing `OpenAICompatibleThingPhotoLabelingService` remains useful for local/provider integration tests. Production mobile traffic should target the relay contract below, never a provider-native endpoint.
 
@@ -18,7 +16,7 @@ The production path is:
 
 1. WITT normalizes the selected image to metadata-free JPEG as it does today.
 2. A mobile-auth component obtains a short-lived, labeling-scoped relay credential.
-3. `RelayThingPhotoLabelingService` sends one provider-neutral request to the WITT relay.
+3. A provider-neutral app adapter sends one request to the WITT relay.
 4. The relay authenticates and authorizes the install, enforces limits, selects the approved model/prompt, and calls the provider with storage disabled.
 5. The relay validates strict structured output and returns only a suggestion or refusal.
 6. WITT shows the editable result. Any auth, network, relay, provider, parsing, timeout, or refusal path leaves manual entry usable.
@@ -166,7 +164,7 @@ Proposed beta alerts are: any credential or photo appearing in logs; spend warni
 
 ## Evaluation Harness And Corpus
 
-The committed manifest is a scorer fixture, not a substitute for the real photo corpus. It proves scoring behavior with expected successes and known regressions. Actual model evaluation should resolve each opaque `image_id` to an encrypted, access-controlled image outside git, invoke a candidate through the staging relay, record only the structured observation and latency, and feed that observation into `ThingPhotoLabelingEvaluator`.
+Build the evaluation harness alongside the real consented corpus, outside the shipping app target. It should resolve each opaque image identifier to an encrypted, access-controlled image outside git, invoke a candidate through the staging relay, and record only structured observations, latency, and aggregate scores.
 
 Build a consented corpus of at least 100 photos before model selection, with balanced strata:
 
@@ -198,7 +196,7 @@ These thresholds are proposed and require Sid's approval. Report aggregate and p
 1. Implement relay and auth exchange in staging with synthetic/consented data only. Threat-model it, run dependency and secret scans, verify log redaction, and prove provider retention settings.
 2. Select provider/model/prompt/config by the accepted corpus. Freeze versioned configuration and archive the content-free score report plus corpus revision hash.
 3. Complete privacy/vendor review, disclosure copy, App Store privacy answers, support runbook, spend caps, alerts, dashboards, and on-call ownership.
-4. Add the app auth provider and explicitly wire `RelayThingPhotoLabelingService` in a separate reviewed change. No static token or provider configuration belongs in app resources or build settings.
+4. Implement the app auth provider and relay adapter in a separate reviewed change. No static token or provider configuration belongs in app resources or build settings.
 5. Enable only for consenting internal TestFlight installs behind a server-side cohort flag. Start with Sid's devices, then 10%, 50%, and 100% of the internal group with at least one day and gate review between stages.
 6. Re-run the fixed evaluation corpus and offline/failure simulations for every model, prompt, schema, relay, or auth change. Provider model aliases must resolve to a pinned revision where available.
 7. Expand beyond internal TestFlight only after the failure budget, cost, quality, privacy, and support evidence is accepted.
@@ -221,7 +219,7 @@ Rollback order:
 - Evaluation corpus consent/provenance process, reviewer(s), and approval of release thresholds.
 - Whether confidence remains internal or becomes user-visible under AI-002.
 
-Until those decisions and gates are complete, the relay type remains unwired and live production AI remains disabled.
+Until those decisions and gates are complete, the relay remains unimplemented and live production AI remains disabled.
 
 ## Primary References
 

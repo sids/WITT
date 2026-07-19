@@ -6,7 +6,9 @@ struct AppShellView: View {
     @State private var presentedScan: ScanPresentation?
     @State private var isPresentingScanner = false
     @State private var pendingScannerOutcome: ScannerOutcome?
+#if DEBUG
     @State private var pendingDemo: ScanDemo?
+#endif
     @State private var thingPostSaveDismissal = ThingPostSaveDismissalState()
     @State private var browseNavigationRequest: BrowseRoute?
     @State private var sharingSheet: PlaceSharingSheet?
@@ -15,15 +17,18 @@ struct AppShellView: View {
     @State private var isRoutingQRCode = false
     @ObservedObject private var shareAcceptanceCenter = PlaceShareAcceptanceCenter.shared
 
-    init(
-        store: CatalogStore,
-        initialScan: ScanDemo? = nil,
-        qrResolver: any QRCodeResolving
-    ) {
+#if DEBUG
+    init(store: CatalogStore, initialScan: ScanDemo? = nil, qrResolver: any QRCodeResolving) {
         self.store = store
         deepLinkRouter = QRDeepLinkRouter(resolver: qrResolver)
         _pendingDemo = State(initialValue: initialScan)
     }
+#else
+    init(store: CatalogStore, qrResolver: any QRCodeResolving) {
+        self.store = store
+        deepLinkRouter = QRDeepLinkRouter(resolver: qrResolver)
+    }
+#endif
 
     var body: some View {
         BrowseView(
@@ -55,6 +60,7 @@ struct AppShellView: View {
                         token: token,
                         onAttached: closeScanFlow
                     )
+#if DEBUG
                 case .review(let destination, let photo):
                     ReviewThingSessionView(
                         store: store,
@@ -68,6 +74,7 @@ struct AppShellView: View {
                         token: token,
                         onAttached: closeScanFlow
                     )
+#endif
                 case .repair(let route):
                     RepairQRCodeView(
                         store: store,
@@ -93,10 +100,12 @@ struct AppShellView: View {
             QRCodePrintingView()
         }
         .onOpenURL(perform: handleDeepLink)
+#if DEBUG
         .onChange(of: store.hasLoaded) { _, loaded in
             guard loaded else { return }
             presentPendingDemoIfPossible()
         }
+#endif
         .onChange(of: store.errorMessage) { _, message in
             guard let message else { return }
             deepLinkAlert = DeepLinkAlert(title: "WITT Couldn't Finish", message: message)
@@ -231,6 +240,7 @@ struct AppShellView: View {
         }
     }
 
+#if DEBUG
     private func presentPendingDemoIfPossible() {
         guard let demo = pendingDemo else { return }
         switch demo {
@@ -270,6 +280,7 @@ struct AppShellView: View {
         }
         pendingDemo = nil
     }
+#endif
 }
 
 enum ScannerOutcome: Equatable {
@@ -289,8 +300,10 @@ private struct ScanPresentation: Identifiable {
     enum Flow {
         case capture(ThingDestination)
         case attach(QRToken)
+#if DEBUG
         case review(ThingDestination, NormalizedPhoto?)
         case createAttach(QRToken)
+#endif
         case repair(QRCodeRepairRoute)
     }
 

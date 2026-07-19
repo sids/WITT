@@ -18,8 +18,6 @@ Relevant implementation:
 - `witt/AI/ThingPhotoLabelingService.swift`
 - `witt/AI/ThingPhotoLabelingServices.swift`
 - `witt/AI/OpenAICompatibleThingPhotoLabelingService.swift`
-- `witt/AI/ThingPhotoLabelingRelayService.swift`
-- `witt/AI/ThingPhotoLabelingEvaluation.swift`
 - `witt/App/ThingPhotoLabelingEnvironment.swift`
 
 ## Runtime Configuration
@@ -54,7 +52,7 @@ A complete endpoint/model configuration selects the remote service. Debug builds
 
 ## Production Boundary
 
-The direct adapter and tests are integrated. An unwired production-preparation client now defines a provider-neutral WITT relay contract with short-lived credential checks, zero-retention request intent, no-cache/no-cookie transport, redirect rejection, correlated and bounded structured responses, and a deterministic evaluation scorer. The committed scorer fixture contains synthetic observations and opaque references; it is not the real consented household-photo corpus and does not activate live AI.
+The direct adapter and tests are integrated. The provider-neutral WITT relay contract, short-lived credential model, privacy controls, evaluation gates, and rollout plan are documented in [ai-production.md](ai-production.md), but speculative relay and evaluation implementations are intentionally not compiled into the app before the backend, authentication strategy, and real evaluation corpus are chosen.
 
 Live AI remains disabled in release until WITT implements and operates the relay/auth service, chooses a production model, approves provider retention terms and user disclosure, configures spend/rate/monitoring controls, builds the real evaluation corpus, and passes the release gates in [ai-production.md](ai-production.md).
 
