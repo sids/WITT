@@ -146,21 +146,21 @@ final class CatalogStore: ObservableObject {
     }
 
     func replaceQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
-        _ = try await repository.replaceQRCode(
+        try await repository.replaceQRCode(
             QRCodeBindingRequest(token: token, target: target)
         )
         try await reloadCatalog()
     }
 
     func repairQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
-        _ = try await repository.repairQRCode(
+        try await repository.repairQRCode(
             QRCodeBindingRequest(token: token, target: target)
         )
         try await reloadCatalog()
     }
 
     func repairAndReplaceQRCode(_ token: QRToken, target: QRBindingTarget) async throws {
-        _ = try await repository.repairAndReplaceQRCode(
+        try await repository.repairAndReplaceQRCode(
             QRCodeBindingRequest(token: token, target: target)
         )
         try await reloadCatalog()
@@ -182,7 +182,7 @@ final class CatalogStore: ObservableObject {
 
     func bind(_ token: QRToken, to target: QRAttachTargetSnapshot) async -> Bool {
         do {
-            _ = try await repository.bindQRCode(
+            try await repository.bindQRCode(
                 QRCodeBindingRequest(token: token, target: target.bindingTarget)
             )
             try await reloadCatalog()

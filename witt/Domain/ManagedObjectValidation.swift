@@ -89,24 +89,20 @@ public enum ManagedObjectDomainValidator {
     }
 
     private static func reference(
-        for object: NSManagedObject,
+        for _: NSManagedObject,
         place: Place?
     ) throws -> PlaceOwnedReference {
         guard let placeID = place?.id else { throw DomainValidationError.missingPlace }
-        let id = (object.value(forKey: "id") as? UUID) ?? object.objectID.uriRepresentation().absoluteString.stableUUID
-        return PlaceOwnedReference(id: id, placeID: placeID)
+        return PlaceOwnedReference(placeID: placeID)
     }
 
     private static func validateNoCycle(_ container: Container) throws {
-        var visited = Set<NSManagedObjectID>()
-        var current = container.parentContainer
-
-        while let candidate = current {
-            guard candidate !== container, visited.insert(candidate.objectID).inserted else {
-                throw DomainValidationError.containerCycle
-            }
-            current = candidate.parentContainer
-        }
+        try ContainmentValidator.validateNoCycle(
+            moving: container,
+            proposedParent: container.parentContainer,
+            id: \.objectID,
+            parent: \.parentContainer
+        )
     }
 
     private static func validatePrimaryPhoto(
@@ -119,20 +115,5 @@ public enum ManagedObjectDomainValidator {
             || photo.areaOwner === expectedOwner
             || photo.placeOwner === expectedOwner
         guard matchesOwner else { throw DomainValidationError.crossPlaceRelationship }
-    }
-}
-
-private extension String {
-    var stableUUID: UUID {
-        var bytes = [UInt8](repeating: 0, count: 16)
-        for (index, byte) in utf8.enumerated() {
-            bytes[index % bytes.count] &+= byte &+ UInt8(truncatingIfNeeded: index)
-        }
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
-            bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
     }
 }

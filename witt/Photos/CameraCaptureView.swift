@@ -229,7 +229,6 @@ private struct SystemCameraPicker: UIViewControllerRepresentable {
 
             let capturedPhoto = CapturedPhoto(
                 data: data,
-                contentType: "image/jpeg",
                 source: .camera,
                 capturedAt: Date()
             )

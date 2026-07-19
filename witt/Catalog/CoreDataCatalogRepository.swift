@@ -134,12 +134,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 if let qrToken = draft.qrToken {
                     try Self.insertQRCode(
                         qrToken,
-                        for: QRTargetObject(
-                            objectID: area.objectID,
-                            place: place,
-                            qrCodes: area.qrCodes,
-                            target: .area(try Self.requiredID(area.id))
-                        ),
+                        for: .area(area, place, try Self.requiredID(area.id)),
                         in: context
                     )
                 }
@@ -178,11 +173,10 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 if let qrToken = draft.qrToken {
                     try Self.insertQRCode(
                         qrToken,
-                        for: QRTargetObject(
-                            objectID: container.objectID,
-                            place: parent.place,
-                            qrCodes: container.qrCodes,
-                            target: .container(try Self.requiredID(container.id))
+                        for: .container(
+                            container,
+                            parent.place,
+                            try Self.requiredID(container.id)
                         ),
                         in: context
                     )
@@ -502,40 +496,11 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 )
 
                 if let photoDraft = draft.photo {
-                    guard
-                        !photoDraft.jpegData.isEmpty,
-                        !photoDraft.contentType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                        photoDraft.dimensions.width > 0,
-                        photoDraft.dimensions.height > 0,
-                        photoDraft.dimensions.width <= Int(Int32.max),
-                        photoDraft.dimensions.height <= Int(Int32.max)
-                    else {
-                        throw CatalogRepositoryError.invalidDraft
-                    }
-                    let photo: PhotoAsset = try Self.insert("PhotoAsset", into: context)
-                    photo.data = photoDraft.jpegData
-                    photo.thumbnailData = photoDraft.thumbnailJPEGData
-                    photo.contentType = photoDraft.contentType
-                    photo.pixelWidth = Int32(photoDraft.dimensions.width)
-                    photo.pixelHeight = Int32(photoDraft.dimensions.height)
-                    photo.byteSize = Int64(photoDraft.byteSize)
-                    photo.kind = photoDraft.persistenceMetadata.kind
-                    photo.source = photoDraft.source.rawValue
-                    photo.capturedAt = photoDraft.capturedAt
-                    photo.place = home.place
-                    photo.thingOwner = thing
-                    thing.primaryPhoto = photo
+                    try Self.applyPhotoMutation(.replace(photoDraft), to: .thing(thing), in: context)
                 }
 
-                let inserted = Array(context.insertedObjects)
-                if let store = home.objectID.persistentStore {
-                    for object in inserted {
-                        context.assign(object, to: store)
-                    }
-                }
-                for object in inserted {
-                    try Self.validateInsertedObject(object)
-                }
+                Self.assignInsertions(in: context, toStoreOf: home.place)
+                try Self.validateChanges(in: context)
                 try context.save()
                 return try Self.snapshot(thing)
             } catch {
@@ -559,10 +524,9 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         }
     }
 
-    @discardableResult
-    public func bindQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding {
+    public func bindQRCode(_ request: QRCodeBindingRequest) async throws {
         try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
+        try await context.perform { [context] in
             context.reset()
             do {
                 let existing = try Self.fetchQRCodes(token: request.token.rawValue, in: context)
@@ -570,7 +534,7 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                    existing[0].state == "bound",
                    Self.bindingTarget(for: existing[0]) == Self.rawTarget(request.target)
                 {
-                    return QRCodeBinding(token: request.token, target: request.target)
+                    return
                 }
                 guard existing.isEmpty else {
                     throw CatalogRepositoryError.tokenAlreadyBound
@@ -583,7 +547,6 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
 
                 try Self.insertQRCode(request.token, for: target, in: context)
                 try context.save()
-                return QRCodeBinding(token: request.token, target: request.target)
             } catch {
                 context.rollback()
                 throw error
@@ -591,10 +554,9 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         }
     }
 
-    @discardableResult
-    public func replaceQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding {
+    public func replaceQRCode(_ request: QRCodeBindingRequest) async throws {
         try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
+        try await context.perform { [context] in
             context.reset()
             do {
                 let target = try Self.fetchQRTarget(request.target, in: context)
@@ -619,7 +581,6 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 }
 
                 try context.save()
-                return QRCodeBinding(token: request.token, target: request.target)
             } catch {
                 context.rollback()
                 throw error
@@ -627,24 +588,22 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
         }
     }
 
-    @discardableResult
-    public func repairQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding {
+    public func repairQRCode(_ request: QRCodeBindingRequest) async throws {
         try await repairQRCode(request, replacingTargetQRCode: false)
     }
 
-    @discardableResult
     public func repairAndReplaceQRCode(
         _ request: QRCodeBindingRequest
-    ) async throws -> QRCodeBinding {
+    ) async throws {
         try await repairQRCode(request, replacingTargetQRCode: true)
     }
 
     private func repairQRCode(
         _ request: QRCodeBindingRequest,
         replacingTargetQRCode: Bool
-    ) async throws -> QRCodeBinding {
+    ) async throws {
         try ensurePersistenceLoaded()
-        return try await context.perform { [context] in
+        try await context.perform { [context] in
             context.reset()
             do {
                 let repairRows = try Self.fetchQRCodes(
@@ -669,7 +628,6 @@ public final class CoreDataCatalogRepository: CatalogRepository, @unchecked Send
                 )
 
                 try context.save()
-                return QRCodeBinding(token: request.token, target: request.target)
             } catch {
                 context.rollback()
                 throw error
@@ -909,45 +867,61 @@ private extension CoreDataCatalogRepository {
     enum StoredQRResolution: Sendable {
         case unknown
         case known(RawQRTarget)
-        case repair(reason: QRCodeRepairReason, bindingID: UUID?)
+        case repair(QRCodeRepairReason)
         case conflict([RawQRTarget])
     }
 
-    struct HomeObject {
-        let objectID: NSManagedObjectID
-        let place: Place
-        let destination: ThingDestination
+    enum HomeObject {
+        case room(Room, Place)
+        case area(Area, Place)
+        case container(Container, Place)
+
+        var place: Place {
+            switch self {
+            case .room(_, let place), .area(_, let place), .container(_, let place):
+                place
+            }
+        }
 
         func apply(to thing: Thing) {
-            switch destination {
-            case .room:
-                thing.homeRoom = try? thing.managedObjectContext?.existingObject(with: objectID) as? Room
-            case .area:
-                thing.homeArea = try? thing.managedObjectContext?.existingObject(with: objectID) as? Area
-            case .container:
-                thing.homeContainer = try? thing.managedObjectContext?.existingObject(with: objectID) as? Container
+            switch self {
+            case .room(let room, _):
+                thing.homeRoom = room
+            case .area(let area, _):
+                thing.homeArea = area
+            case .container(let container, _):
+                thing.homeContainer = container
             }
         }
     }
 
     struct ContainerParentObject {
-        let objectID: NSManagedObjectID
+        enum Parent {
+            case room(Room)
+            case area(Area)
+            case container(Container)
+        }
+
+        let parent: Parent
         let place: Place
-        let destination: ContainerDestination
         let childSortOrders: [Int32]
-        let containerParent: Container?
+
+        var containerParent: Container? {
+            guard case .container(let container) = parent else { return nil }
+            return container
+        }
 
         func apply(to container: Container) {
             container.parentRoom = nil
             container.parentArea = nil
             container.parentContainer = nil
-            switch destination {
-            case .room:
-                container.parentRoom = try? container.managedObjectContext?.existingObject(with: objectID) as? Room
-            case .area:
-                container.parentArea = try? container.managedObjectContext?.existingObject(with: objectID) as? Area
-            case .container:
-                container.parentContainer = try? container.managedObjectContext?.existingObject(with: objectID) as? Container
+            switch parent {
+            case .room(let room):
+                container.parentRoom = room
+            case .area(let area):
+                container.parentArea = area
+            case .container(let parent):
+                container.parentContainer = parent
             }
         }
     }
@@ -997,18 +971,43 @@ private extension CoreDataCatalogRepository {
         }
     }
 
-    struct QRTargetObject {
-        let objectID: NSManagedObjectID
-        let place: Place
-        let qrCodes: NSSet?
-        let target: RawQRTarget
+    enum QRTargetObject {
+        case area(Area, Place, UUID)
+        case container(Container, Place, UUID)
+
+        var objectID: NSManagedObjectID {
+            switch self {
+            case .area(let area, _, _): area.objectID
+            case .container(let container, _, _): container.objectID
+            }
+        }
+
+        var place: Place {
+            switch self {
+            case .area(_, let place, _), .container(_, let place, _): place
+            }
+        }
+
+        var qrCodes: NSSet? {
+            switch self {
+            case .area(let area, _, _): area.qrCodes
+            case .container(let container, _, _): container.qrCodes
+            }
+        }
+
+        var target: RawQRTarget {
+            switch self {
+            case .area(_, _, let id): .area(id)
+            case .container(_, _, let id): .container(id)
+            }
+        }
 
         func apply(to qrCode: QRCode) {
-            switch target {
-            case .area:
-                qrCode.area = try? qrCode.managedObjectContext?.existingObject(with: objectID) as? Area
-            case .container:
-                qrCode.container = try? qrCode.managedObjectContext?.existingObject(with: objectID) as? Container
+            switch self {
+            case .area(let area, _, _):
+                qrCode.area = area
+            case .container(let container, _, _):
+                qrCode.container = container
             }
         }
     }
@@ -1117,19 +1116,19 @@ private extension CoreDataCatalogRepository {
             guard isActive(room), let place = room.place else {
                 throw CatalogRepositoryError.destinationNotFound
             }
-            return HomeObject(objectID: room.objectID, place: place, destination: destination)
+            return .room(room, place)
         case .area(let id):
             let area: Area = try fetchOne(id: id, entityName: "Area", in: context)
             guard isActive(area), let place = area.place else {
                 throw CatalogRepositoryError.destinationNotFound
             }
-            return HomeObject(objectID: area.objectID, place: place, destination: destination)
+            return .area(area, place)
         case .container(let id):
             let container: Container = try fetchOne(id: id, entityName: "Container", in: context)
             guard isActive(container), let place = container.place else {
                 throw CatalogRepositoryError.destinationNotFound
             }
-            return HomeObject(objectID: container.objectID, place: place, destination: destination)
+            return .container(container, place)
         }
     }
 
@@ -1144,11 +1143,9 @@ private extension CoreDataCatalogRepository {
                 throw CatalogRepositoryError.destinationNotFound
             }
             return ContainerParentObject(
-                objectID: room.objectID,
+                parent: .room(room),
                 place: place,
-                destination: destination,
-                childSortOrders: managedObjects(room.containers, as: Container.self).map(\.sortOrder),
-                containerParent: nil
+                childSortOrders: managedObjects(room.containers, as: Container.self).map(\.sortOrder)
             )
         case .area(let id):
             let area: Area = try fetchOne(id: id, entityName: "Area", in: context)
@@ -1156,11 +1153,9 @@ private extension CoreDataCatalogRepository {
                 throw CatalogRepositoryError.destinationNotFound
             }
             return ContainerParentObject(
-                objectID: area.objectID,
+                parent: .area(area),
                 place: place,
-                destination: destination,
-                childSortOrders: managedObjects(area.containers, as: Container.self).map(\.sortOrder),
-                containerParent: nil
+                childSortOrders: managedObjects(area.containers, as: Container.self).map(\.sortOrder)
             )
         case .container(let id):
             let parent: Container = try fetchOne(id: id, entityName: "Container", in: context)
@@ -1168,11 +1163,9 @@ private extension CoreDataCatalogRepository {
                 throw CatalogRepositoryError.destinationNotFound
             }
             return ContainerParentObject(
-                objectID: parent.objectID,
+                parent: .container(parent),
                 place: place,
-                destination: destination,
-                childSortOrders: managedObjects(parent.childContainers, as: Container.self).map(\.sortOrder),
-                containerParent: parent
+                childSortOrders: managedObjects(parent.childContainers, as: Container.self).map(\.sortOrder)
             )
         }
     }
@@ -1184,23 +1177,13 @@ private extension CoreDataCatalogRepository {
             guard isActive(area), let place = area.place else {
                 throw CatalogRepositoryError.targetNotFound
             }
-            return QRTargetObject(
-                objectID: area.objectID,
-                place: place,
-                qrCodes: area.qrCodes,
-                target: .area(id.rawValue)
-            )
+            return .area(area, place, id.rawValue)
         case .container(let id):
             let container: Container = try fetchOne(id: id.rawValue, entityName: "Container", in: context, notFound: .targetNotFound)
             guard isActive(container), let place = container.place else {
                 throw CatalogRepositoryError.targetNotFound
             }
-            return QRTargetObject(
-                objectID: container.objectID,
-                place: place,
-                qrCodes: container.qrCodes,
-                target: .container(id.rawValue)
-            )
+            return .container(container, place, id.rawValue)
         }
     }
 
@@ -1259,12 +1242,7 @@ private extension CoreDataCatalogRepository {
         switch selection {
         case .area:
             guard isActive(area) else { throw CatalogRepositoryError.targetNotFound }
-            return QRTargetObject(
-                objectID: area.objectID,
-                place: place,
-                qrCodes: area.qrCodes,
-                target: .area(try requiredID(area.id))
-            )
+            return .area(area, place, try requiredID(area.id))
         case .existingContainer(let id):
             let container: Container = try fetchOne(
                 id: id,
@@ -1275,12 +1253,7 @@ private extension CoreDataCatalogRepository {
             guard isActive(container), container.place === place, rootArea(of: container) === area else {
                 throw CatalogRepositoryError.selectionDoesNotBelongToParent
             }
-            return QRTargetObject(
-                objectID: container.objectID,
-                place: place,
-                qrCodes: container.qrCodes,
-                target: .container(id)
-            )
+            return .container(container, place, id)
         case .newContainer(let name):
             let container: Container = try insert("Container", into: context)
             container.name = try requiredName(name)
@@ -1290,12 +1263,7 @@ private extension CoreDataCatalogRepository {
             container.parentArea = area
             container.place = place
             guard let id = container.id else { throw CatalogRepositoryError.missingIdentity }
-            return QRTargetObject(
-                objectID: container.objectID,
-                place: place,
-                qrCodes: container.qrCodes,
-                target: .container(id)
-            )
+            return .container(container, place, id)
         }
     }
 
@@ -1337,21 +1305,21 @@ private extension CoreDataCatalogRepository {
         guard !rows.isEmpty else { return .unknown }
 
         var activeTargets: [RawQRTarget] = []
-        var repair: (QRCodeRepairReason, UUID?)?
+        var repair: QRCodeRepairReason?
         for row in rows {
             guard !row.token.isEmpty else {
-                repair = repair ?? (.invalidStoredToken, row.id)
+                repair = repair ?? .invalidStoredToken
                 continue
             }
             guard row.state == "bound" else {
-                repair = repair ?? (.missingTarget, row.id)
+                repair = repair ?? .missingTarget
                 continue
             }
 
             let rowTargets = bindingTargets(for: row)
             guard rowTargets.count == 1 else {
                 if rowTargets.isEmpty {
-                    repair = repair ?? (.missingTarget, row.id)
+                    repair = repair ?? .missingTarget
                 } else {
                     activeTargets.append(contentsOf: rowTargets)
                 }
@@ -1368,13 +1336,13 @@ private extension CoreDataCatalogRepository {
             return .conflict(distinctTargets)
         }
         if let repair {
-            return .repair(reason: repair.0, bindingID: repair.1)
+            return .repair(repair)
         }
         if rows.count > 1 {
-            return .repair(reason: .duplicateBindings, bindingID: rows.first?.id)
+            return .repair(.duplicateBindings)
         }
         guard let target = distinctTargets.first else {
-            return .repair(reason: .missingTarget, bindingID: rows.first?.id)
+            return .repair(.missingTarget)
         }
         return .known(target)
     }
@@ -1599,7 +1567,7 @@ private extension CoreDataCatalogRepository {
             photo.pixelWidth = Int32(draft.dimensions.width)
             photo.pixelHeight = Int32(draft.dimensions.height)
             photo.byteSize = Int64(draft.byteSize)
-            photo.kind = draft.persistenceMetadata.kind
+            photo.kind = "original"
             photo.source = draft.source.rawValue
             photo.capturedAt = draft.capturedAt
             photo.place = place
@@ -1624,15 +1592,12 @@ private extension CoreDataCatalogRepository {
         _ movingContainer: Container,
         to parent: ContainerParentObject
     ) throws {
-        guard let proposedParent = parent.containerParent else { return }
-        var current: Container? = proposedParent
-        var seen = Set<NSManagedObjectID>()
-        while let candidate = current {
-            guard candidate !== movingContainer, seen.insert(candidate.objectID).inserted else {
-                throw DomainValidationError.containerCycle
-            }
-            current = candidate.parentContainer
-        }
+        try ContainmentValidator.validateNoCycle(
+            moving: movingContainer,
+            proposedParent: parent.containerParent,
+            id: \.objectID,
+            parent: \.parentContainer
+        )
     }
 
     nonisolated static func archiveSubtree(for room: Room) -> [NSManagedObject] {
@@ -1748,8 +1713,8 @@ private extension CoreDataCatalogRepository {
             .knownArea(QRTargetID(rawValue: id))
         case .known(.container(let id)):
             .knownContainer(QRTargetID(rawValue: id))
-        case .repair(let reason, let bindingID):
-            .needsRepair(QRCodeRepair(reason: reason, bindingID: bindingID))
+        case .repair(let reason):
+            .needsRepair(QRCodeRepair(reason: reason))
         case .conflict(let targets):
             .conflict(QRCodeConflict(
                 firstTarget: publicTarget(targets[0]),

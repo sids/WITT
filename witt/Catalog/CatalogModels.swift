@@ -412,14 +412,10 @@ public protocol CatalogRepository: QRCodeResolving {
     func archiveThing(id: UUID) async throws -> ThingSnapshot
     func saveThing(_ draft: ReviewedThingDraft, to destination: ThingDestination) async throws -> ThingSnapshot
     func unassignedQRCodeTargets() async throws -> [QRAttachTargetSnapshot]
-    @discardableResult func bindQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
-    @discardableResult func replaceQRCode(_ request: QRCodeBindingRequest) async throws -> QRCodeBinding
-    @discardableResult func repairQRCode(
-        _ request: QRCodeBindingRequest
-    ) async throws -> QRCodeBinding
-    @discardableResult func repairAndReplaceQRCode(
-        _ request: QRCodeBindingRequest
-    ) async throws -> QRCodeBinding
+    func bindQRCode(_ request: QRCodeBindingRequest) async throws
+    func replaceQRCode(_ request: QRCodeBindingRequest) async throws
+    func repairQRCode(_ request: QRCodeBindingRequest) async throws
+    func repairAndReplaceQRCode(_ request: QRCodeBindingRequest) async throws
     func repairQRCodeTargetIsEligible(
         _ request: QRCodeBindingRequest
     ) async throws -> Bool

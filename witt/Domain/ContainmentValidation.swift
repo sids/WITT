@@ -14,11 +14,9 @@ public enum DomainValidationError: Error, Equatable, Sendable {
 }
 
 public struct PlaceOwnedReference: Equatable, Sendable {
-    public let id: UUID
     public let placeID: UUID
 
-    public init(id: UUID, placeID: UUID) {
-        self.id = id
+    public init(placeID: UUID) {
         self.placeID = placeID
     }
 }
@@ -132,14 +130,30 @@ public enum ContainmentValidator {
         proposedParentID: UUID?,
         parentByContainerID: [UUID: UUID?]
     ) throws {
-        var visited = Set<UUID>()
-        var current = proposedParentID
+        try validateNoCycle(
+            moving: movingContainerID,
+            proposedParent: proposedParentID,
+            id: { $0 },
+            parent: { parentByContainerID[$0] ?? nil }
+        )
+    }
 
-        while let containerID = current {
-            guard containerID != movingContainerID, visited.insert(containerID).inserted else {
+    static func validateNoCycle<Node, ID: Hashable>(
+        moving: Node,
+        proposedParent: Node?,
+        id: (Node) -> ID,
+        parent: (Node) -> Node?
+    ) throws {
+        let movingID = id(moving)
+        var visited = Set<ID>()
+        var current = proposedParent
+
+        while let candidate = current {
+            let candidateID = id(candidate)
+            guard candidateID != movingID, visited.insert(candidateID).inserted else {
                 throw DomainValidationError.containerCycle
             }
-            current = parentByContainerID[containerID] ?? nil
+            current = parent(candidate)
         }
     }
 

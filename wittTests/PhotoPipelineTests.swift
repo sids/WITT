@@ -45,7 +45,6 @@ final class PhotoPipelineTests: XCTestCase {
         let normalized = try PhotoNormalizer().normalize(
             CapturedPhoto(
                 data: inputData,
-                contentType: "image/jpeg",
                 source: .camera
             )
         )
@@ -65,7 +64,6 @@ final class PhotoPipelineTests: XCTestCase {
         let normalized = try PhotoNormalizer().normalize(
             CapturedPhoto(
                 data: inputData,
-                contentType: "image/jpeg",
                 source: .photoLibrary
             )
         )
@@ -86,7 +84,6 @@ final class PhotoPipelineTests: XCTestCase {
         let normalized = try PhotoNormalizer().normalize(
             CapturedPhoto(
                 data: inputData,
-                contentType: "image/jpeg",
                 source: .camera
             )
         )
@@ -103,12 +100,11 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(thumbnailEXIF?[kCGImagePropertyExifUserComment as String])
     }
 
-    func testAIInputAndPersistenceMetadataUseNormalizedValues() throws {
+    func testNormalizedPhotoExposesAIAndPersistenceValues() throws {
         let capturedAt = Date(timeIntervalSince1970: 1_234_567)
         let normalized = try PhotoNormalizer().normalize(
             CapturedPhoto(
                 data: try makeJPEG(width: 640, height: 480),
-                contentType: "image/jpeg",
                 source: .photoLibrary,
                 capturedAt: capturedAt
             )
@@ -118,14 +114,12 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(normalized.photoInput.contentType, "image/jpeg")
         XCTAssertEqual(normalized.photoInput.dimensions, .init(width: 640, height: 480))
 
-        let metadata = normalized.persistenceMetadata
-        XCTAssertEqual(metadata.contentType, "image/jpeg")
-        XCTAssertEqual(metadata.pixelWidth, 640)
-        XCTAssertEqual(metadata.pixelHeight, 480)
-        XCTAssertEqual(metadata.byteSize, normalized.jpegData.count)
-        XCTAssertEqual(metadata.kind, "original")
-        XCTAssertEqual(metadata.source, PhotoCaptureSource.photoLibrary.rawValue)
-        XCTAssertEqual(metadata.capturedAt, capturedAt)
+        XCTAssertEqual(normalized.contentType, "image/jpeg")
+        XCTAssertEqual(normalized.dimensions.width, 640)
+        XCTAssertEqual(normalized.dimensions.height, 480)
+        XCTAssertEqual(normalized.byteSize, normalized.jpegData.count)
+        XCTAssertEqual(normalized.source, .photoLibrary)
+        XCTAssertEqual(normalized.capturedAt, capturedAt)
     }
 
     func testNormalizerRejectsInvalidImageData() {
@@ -133,7 +127,6 @@ final class PhotoPipelineTests: XCTestCase {
             try PhotoNormalizer().normalize(
                 CapturedPhoto(
                     data: Data([0x00, 0x01]),
-                    contentType: "image/jpeg",
                     source: .camera
                 )
             )

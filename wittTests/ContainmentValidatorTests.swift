@@ -107,7 +107,7 @@ final class ContainmentValidatorTests: XCTestCase {
     }
 
     private func reference(placeID: UUID) -> PlaceOwnedReference {
-        PlaceOwnedReference(id: UUID(), placeID: placeID)
+        PlaceOwnedReference(placeID: placeID)
     }
 
     private func assertError(

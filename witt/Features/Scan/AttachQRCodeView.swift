@@ -227,8 +227,6 @@ struct RepairQRCodeView: View {
             switch repair.reason {
             case .missingTarget:
                 "This QR code's previous destination is no longer available. Choose a new destination to repair it."
-            case .unsupportedTargetKind:
-                "This QR code's previous destination is not supported. Choose a Storage Area or Container to repair it."
             case .invalidStoredToken, .duplicateBindings:
                 "This QR code has a damaged attachment. Choose one destination to repair it."
             }

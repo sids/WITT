@@ -70,8 +70,7 @@ final class CatalogRepositoryTests: XCTestCase {
         let area = try XCTUnwrap(targets.first { $0.kind == .area })
         let token = try XCTUnwrap(QRToken(rawValue: "AAAAAAAAAAAAAAAAAAAAAA"))
 
-        let binding = try await repository.bindQRCode(.init(token: token, target: area.bindingTarget))
-        XCTAssertEqual(binding.target, area.bindingTarget)
+        try await repository.bindQRCode(.init(token: token, target: area.bindingTarget))
         let resolution = try await repository.resolve(token)
         let remainingTargets = try await repository.unassignedQRCodeTargets()
         XCTAssertEqual(resolution, .knownArea(QRTargetID(rawValue: area.id)))
@@ -322,11 +321,10 @@ final class CatalogRepositoryTests: XCTestCase {
             try context.save()
         }
 
-        let binding = try await repository.replaceQRCode(.init(
+        try await repository.replaceQRCode(.init(
             token: retainedToken, target: areaTarget
         ))
 
-        XCTAssertEqual(binding, QRCodeBinding(token: retainedToken, target: areaTarget))
         let retainedResolution = try await repository.resolve(retainedToken)
         let obsoleteResolution = try await repository.resolve(obsoleteToken)
         XCTAssertEqual(retainedResolution, .knownArea(QRTargetID(rawValue: area.id)))
@@ -395,12 +393,11 @@ final class CatalogRepositoryTests: XCTestCase {
             try context.save()
         }
 
-        let binding = try await repository.repairQRCode(.init(
+        try await repository.repairQRCode(.init(
             token: token,
             target: .area(QRTargetID(rawValue: target.id))
         ))
 
-        XCTAssertEqual(binding.target, .area(QRTargetID(rawValue: target.id)))
         let resolution = try await repository.resolve(token)
         XCTAssertEqual(resolution, .knownArea(QRTargetID(rawValue: target.id)))
         try await context.perform {

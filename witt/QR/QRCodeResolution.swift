@@ -23,30 +23,17 @@ public struct QRCodeBindingRequest: Hashable, Sendable, Codable {
     }
 }
 
-public struct QRCodeBinding: Hashable, Sendable, Codable {
-    public let token: QRToken
-    public let target: QRBindingTarget
-
-    public init(token: QRToken, target: QRBindingTarget) {
-        self.token = token
-        self.target = target
-    }
-}
-
 public enum QRCodeRepairReason: Hashable, Sendable, Codable {
     case missingTarget
-    case unsupportedTargetKind
     case invalidStoredToken
     case duplicateBindings
 }
 
 public struct QRCodeRepair: Hashable, Sendable, Codable {
     public let reason: QRCodeRepairReason
-    public let bindingID: UUID?
 
-    public init(reason: QRCodeRepairReason, bindingID: UUID? = nil) {
+    public init(reason: QRCodeRepairReason) {
         self.reason = reason
-        self.bindingID = bindingID
     }
 }
 

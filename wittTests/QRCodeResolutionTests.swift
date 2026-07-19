@@ -8,13 +8,15 @@ final class QRCodeResolutionTests: XCTestCase {
         let containerID = QRTargetID(rawValue: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!)
 
         XCTAssertEqual(QRCodeBindingRequest(token: token, target: .area(areaID)).target, .area(areaID))
-        XCTAssertEqual(QRCodeBinding(token: token, target: .container(containerID)).target, .container(containerID))
+        XCTAssertEqual(
+            QRCodeBindingRequest(token: token, target: .container(containerID)).target,
+            .container(containerID)
+        )
     }
 
     func testResolutionStatesRetainTheirAssociatedValues() {
         let areaID = QRTargetID(rawValue: UUID())
         let containerID = QRTargetID(rawValue: UUID())
-        let repairID = UUID()
         let conflict = QRCodeConflict(
             firstTarget: .area(areaID),
             secondTarget: .container(containerID),
@@ -25,8 +27,8 @@ final class QRCodeResolutionTests: XCTestCase {
         XCTAssertEqual(QRCodeResolution.knownContainer(containerID), .knownContainer(containerID))
         XCTAssertEqual(QRCodeResolution.unknown, .unknown)
         XCTAssertEqual(
-            QRCodeResolution.needsRepair(.init(reason: .missingTarget, bindingID: repairID)),
-            .needsRepair(.init(reason: .missingTarget, bindingID: repairID))
+            QRCodeResolution.needsRepair(.init(reason: .missingTarget)),
+            .needsRepair(.init(reason: .missingTarget))
         )
         XCTAssertEqual(conflict.targets, [.area(areaID), .container(containerID), .area(areaID)])
         XCTAssertEqual(QRCodeResolution.conflict(conflict), .conflict(conflict))
@@ -84,7 +86,7 @@ final class QRCodeResolutionTests: XCTestCase {
 
     func testDeepLinkRouterPreservesRepairTokenAndDetails() async throws {
         let token = try XCTUnwrap(QRToken(rawValue: "repair payload"))
-        let repair = QRCodeRepair(reason: .missingTarget, bindingID: UUID())
+        let repair = QRCodeRepair(reason: .missingTarget)
         let router = QRDeepLinkRouter(resolver: StubResolver(result: .needsRepair(repair)))
 
         let destination = try await router.destination(for: token)

@@ -44,8 +44,6 @@ public struct PhotoLibraryPicker<Label: View>: View {
             try Task.checkCancellation()
             let capturedPhoto = CapturedPhoto(
                 data: data,
-                contentType: item.supportedContentTypes.first?.identifier
-                    ?? "application/octet-stream",
                 source: .photoLibrary
             )
             let normalizer = normalizer
