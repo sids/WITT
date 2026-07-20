@@ -12,10 +12,10 @@ This page records durable distribution facts and the repeatable release process.
 | CloudKit container | `iCloud.in.sids.witt` |
 | CloudKit production schema | Deployed July 15, 2026; post-deploy export exactly matches the 8-record-type development schema, including both `PhotoAsset` asset mappings |
 | Internal TestFlight group | `WITT Internal` |
-| Current TestFlight build | 1.0 (7) |
-| Source commit | `d723e9e` |
-| App Store Connect build ID | `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3` |
-| Build state | `IN_BETA_TESTING` in `WITT Internal` with auto-notify enabled; FB-024 affected-device verification complete |
+| Current TestFlight build | 1.0 (8) |
+| Source commit | `63d2acd` |
+| App Store Connect build ID | `3c9442bf-cb1b-4d1d-bfac-f6b1eb390a85` |
+| Build state | `VALID` and `IN_BETA_TESTING` in `WITT Internal` with auto-notify enabled |
 | Xcode / SDK | Xcode 27.0 (`27A5218g`) / iOS 27.0 |
 | Minimum OS | iOS 26 |
 | Non-exempt encryption | No |
@@ -24,6 +24,7 @@ This page records durable distribution facts and the repeatable release process.
 
 | Build | Source | App Store Connect ID | Internal state | Verification |
 | --- | --- | --- | --- | --- |
+| 1.0 (8) | `63d2acd` | `3c9442bf-cb1b-4d1d-bfac-f6b1eb390a85` | `VALID` and `IN_BETA_TESTING` in `WITT Internal` | 171 simulator tests in Debug and 167 in Release-optimized configuration; fast Thing post-save loop, guided QR repair and reattach, camera/scanner permission recovery, cancellable photo ingestion, accessibility and navigation hardening, and the July simplification pass; production CloudKit/push entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 executable/dSYM UUID `DBE91814-BED3-37AC-A2A1-2EFE2AC15AC8`; What to Test and internal-group relationship independently verified; auto-notify enabled |
 | 1.0 (7) | `d723e9e` | `9d5cf61b-cd1a-40bb-b198-0c62cf2254c3` | `IN_BETA_TESTING` in `WITT Internal` | 145 simulator tests in Debug and clean Release-optimized configurations; arbitrary QR payload support and Browse creation-control polish; production CloudKit/push/TestFlight entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 executable/dSYM UUID `8802BEB9-138D-3CCA-BAF0-C4E153AAA3E0`; What to Test and internal-group relationship verified; on July 15, 2026, the affected iPhone successfully created, saved, reopened, and retained a Container across relaunch, completing FB-024 |
 | 1.0 (6) | `66fe38f` | `fdd162af-54ce-4cc4-967c-eb6296dc9966` | `IN_BETA_TESTING` in `WITT Internal` | 134 simulator tests in Debug and Release-optimized configurations; production CloudKit/push/TestFlight entitlements; minimum iOS 26; no non-exempt encryption; matching arm64 dSYM; What to Test and internal-group relationship verified; affected-device Container confirmation pending |
 | 1.0 (5) | `f34fead` | `f7c85715-461d-427b-ab52-72a0aab6aeb7` | `IN_BETA_TESTING` in `WITT Internal` | 132 simulator tests in Debug and Release-optimized configurations; release Container persistence regression; build-4 store compatibility; production CloudKit/push entitlements; matching dSYM; What to Test verified; affected-device confirmation pending |

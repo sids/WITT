@@ -1,6 +1,6 @@
 # WITT Todo
 
-Updated July 19, 2026.
+Updated July 20, 2026.
 
 This is the canonical source of truth for actionable WITT work. New TestFlight feedback lands in the inbox before implementation starts. Completed work belongs in [status.md](status.md), [release.md](release.md), and Git history rather than accumulating here.
 
@@ -20,7 +20,7 @@ Workflow:
 
 ## Feedback Inbox
 
-- [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (7)`. Close when Sid considers the review pass complete.
+- [ ] FB-001 - Continue collecting and triaging Sid's feedback on the current TestFlight build; latest is `1.0 (8)`. Close when Sid considers the review pass complete.
 - [ ] TF-003 - Add Divya to `WITT Internal` for the two-account sharing spike. Sid grants her WITT app visibility in App Store Connect while retaining her current apps and SALES role; Codex then sends and verifies the TestFlight group invitation.
 - [ ] FB-030 - Rename the App Store-facing app from `WITT: Where Is The Thing?` to match the new expansion, `WITT: Where Is That Thing?`. Apple rejected the exact requested name because another account uses it. Choose an available variant, update the `en-US` App Info localization, and verify the App Store Connect record while keeping the on-device label `WITT`.
 
@@ -69,6 +69,7 @@ The prepared recommendations and failure criteria are in [product-decisions.md](
   - [ ] Repeat full-resolution camera and iCloud-library ingestion on devices, including dismiss/reopen, memory warnings, sustained sessions, and thermal pressure.
 - [ ] TEST-001 - Add focused regression tests with each change and keep both full simulator configurations green.
   - [x] July 19 simplification checkpoint: 171 Debug and 167 Release-optimized tests passed with zero failures or skips; Debug and Release builds succeeded, and Release inspection found no screenshot-demo, mock-labeling, relay, evaluator, or removed compatibility-wrapper symbols.
+  - [x] July 20 build 8 release checkpoint: 171 Debug and 167 Release-optimized tests passed; archive/export succeeded, and App Store Connect independently verified What to Test, production entitlements, and the `WITT Internal` relationship.
 
 ## P2 - App Store Release
 
